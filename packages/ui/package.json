@@ -1,0 +1,19 @@
+{
+  "name": "@saknaha/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc -b",
+    "test": "vitest run --config ../../vitest.config.ts --configLoader runner --passWithNoTests",
+    "test:watch": "vitest --config ../../vitest.config.ts --configLoader runner --passWithNoTests",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

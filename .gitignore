@@ -1,0 +1,10 @@
+node_modules/
+.turbo/
+dist/
+apps/*/dist/
+vite-dev.log
+vite-dev.err
+apps/*/vite-dev.log
+apps/*/vite-dev.err
+.env
+.DS_Store

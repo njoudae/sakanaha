@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@saknaha/constants": ["packages/constants/src/index.ts"],
+      "@saknaha/constants/*": ["packages/constants/src/*"],
+      "@saknaha/shared-types": ["packages/shared-types/src/index.ts"],
+      "@saknaha/utils": ["packages/utils/src/index.ts"],
+      "@saknaha/utils/*": ["packages/utils/src/*"]
+    }
+  }
+}
