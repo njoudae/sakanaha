@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
+  "buildCommand": "npx convex deploy --cmd-url-env-var-name VITE_CONVEX_URL --cmd \"npm run build\"",
+  "installCommand": "npm install --include=dev",
   "outputDirectory": "apps/web/dist",
   "rewrites": [
     {
