@@ -1,6 +1,6 @@
 import { ArrowRight, UserRoundCheck } from "lucide-react";
 import { useState } from "react";
-import { registerUser } from "../services/userService";
+import { useAuthService } from "../auth";
 import type { User, UserRole } from "@saknaha/shared-types";
 
 interface UserRegisterPageProps {
@@ -9,6 +9,7 @@ interface UserRegisterPageProps {
 }
 
 export default function UserRegisterPage({ onDone, onBack }: UserRegisterPageProps) {
+  const authService = useAuthService();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<UserRole>("student");
@@ -16,9 +17,9 @@ export default function UserRegisterPage({ onDone, onBack }: UserRegisterPagePro
   const [monthlyBudget, setMonthlyBudget] = useState("2000");
   const [acceptsRoommate, setAcceptsRoommate] = useState(true);
 
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault();
-    const user = registerUser({
+    const user = await authService.registerUser({
       name,
       phone,
       role,

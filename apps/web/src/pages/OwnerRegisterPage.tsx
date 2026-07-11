@@ -1,6 +1,6 @@
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { useState } from "react";
-import { registerOwner } from "../services/userService";
+import { useAuthService } from "../auth";
 import type { Owner } from "@saknaha/shared-types";
 
 interface OwnerRegisterPageProps {
@@ -9,13 +9,14 @@ interface OwnerRegisterPageProps {
 }
 
 export default function OwnerRegisterPage({ onDone, onBack }: OwnerRegisterPageProps) {
+  const authService = useAuthService();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [ministryPropertyNumber, setMinistryPropertyNumber] = useState("");
 
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault();
-    const owner = registerOwner({ fullName, phone, ministryPropertyNumber });
+    const owner = await authService.registerOwner({ fullName, phone, ministryPropertyNumber });
     onDone(owner);
   }
 

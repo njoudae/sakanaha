@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "composite": true,
+    "strict": true,
+    "module": "ESNext",
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM"],
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "moduleResolution": "Bundler",
+    "baseUrl": "..",
+    "paths": {
+      "@saknaha/providers": ["packages/providers/src/index.ts"],
+      "@saknaha/providers/*": ["packages/providers/src/*"]
+    },
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "tsBuildInfoFile": "../node_modules/.tmp/convex-tsconfig.tsbuildinfo"
+  },
+  "include": ["./**/*", "../packages/providers/src/**/*.ts"],
+  "exclude": ["../packages/providers/src/**/*.test.ts"]
+}
