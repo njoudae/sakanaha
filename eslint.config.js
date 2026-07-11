@@ -11,6 +11,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/build/**",
       "**/coverage/**",
+      "**/convex/_generated/**",
       ".turbo/**",
       "package-lock.json",
     ],

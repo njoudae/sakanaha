@@ -1,6 +1,6 @@
 import { ArrowRight, LogIn, Search, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { loginUser } from "../services/userService";
+import { useAuthService } from "../auth";
 import type { User } from "@saknaha/shared-types";
 
 interface UserLoginPageProps {
@@ -10,12 +10,13 @@ interface UserLoginPageProps {
 }
 
 export default function UserLoginPage({ onLogin, onCreateAccount, onHome }: UserLoginPageProps) {
+  const authService = useAuthService();
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
 
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault();
-    const user = loginUser(phone);
+    const user = await authService.loginUserWithPhone(phone);
     if (!user) {
       setError("لم نجد حسابًا بهذا الرقم. يمكنك إنشاء حساب جديد للمتابعة.");
       return;

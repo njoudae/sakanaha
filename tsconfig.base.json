@@ -19,6 +19,8 @@
     "paths": {
       "@saknaha/constants": ["packages/constants/src/index.ts"],
       "@saknaha/constants/*": ["packages/constants/src/*"],
+      "@saknaha/providers": ["packages/providers/src/index.ts"],
+      "@saknaha/providers/*": ["packages/providers/src/*"],
       "@saknaha/shared-types": ["packages/shared-types/src/index.ts"],
       "@saknaha/utils": ["packages/utils/src/index.ts"],
       "@saknaha/utils/*": ["packages/utils/src/*"]

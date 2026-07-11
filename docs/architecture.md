@@ -39,8 +39,8 @@ Saknaha will use a Convex-first backend architecture:
 
 Convex becomes the source of truth for all production data:
 
-- tenants and memberships,
 - user and owner profiles,
+- service provider profiles and service offerings,
 - properties and property status,
 - media metadata,
 - favorites and interests,
@@ -64,9 +64,9 @@ Default authentication:
 Authorization rules:
 
 - Every private Convex query or mutation must derive the current user from the authenticated session.
-- Tenant-scoped functions must verify membership and role before accessing tenant data.
+- Owner, service provider, moderator, support, and admin functions must verify platform role and direct resource ownership or explicit scoped permission before accessing private data.
 - Public listing queries may return only published, safe fields.
-- Owner IDs, tenant IDs, user IDs, and property IDs from clients are treated as untrusted input.
+- Owner IDs, user IDs, and property IDs from clients are treated as untrusted input.
 
 ## Provider Strategy
 

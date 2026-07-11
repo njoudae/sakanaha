@@ -104,35 +104,21 @@ export default function HomeMap() {
     const house = mapMarkers.find((marker) => marker.kind === "property");
     const universities = mapMarkers.filter((marker) => marker.kind === "university");
 
-    async function addRealRoadRoute(
-      start: { lat: number; lng: number },
-      end: { lat: number; lng: number },
-      color: string,
-    ) {
-      try {
-        const response = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`,
-        );
-        if (!response.ok) return;
-        const data = await response.json();
-        const coords: Array<[number, number]> = data.routes?.[0]?.geometry?.coordinates;
-        if (!coords?.length) return;
-
-        const latLngs = coords.map(([lng, lat]) => [lat, lng] as [number, number]);
-        L.polyline(latLngs, {
-          color,
-          weight: 4,
-          opacity: 0.72,
-        }).addTo(map);
-      } catch {
-        // The map still works without route lines.
-      }
-    }
-
     if (house) {
       const colors = ["#7f3b75", "#25856f", "#4f8aa8"];
       universities.forEach((university, index) => {
-        void addRealRoadRoute(university, house, colors[index % colors.length]);
+        L.polyline(
+          [
+            [university.lat, university.lng],
+            [house.lat, house.lng],
+          ],
+          {
+            color: colors[index % colors.length],
+            weight: 4,
+            opacity: 0.52,
+            dashArray: "8 8",
+          },
+        ).addTo(map);
       });
     }
 

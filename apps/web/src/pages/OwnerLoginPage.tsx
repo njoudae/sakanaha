@@ -1,6 +1,6 @@
 import { ArrowRight, LogIn, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { loginOwner } from "../services/userService";
+import { useAuthService } from "../auth";
 import type { Owner } from "@saknaha/shared-types";
 
 interface OwnerLoginPageProps {
@@ -10,12 +10,13 @@ interface OwnerLoginPageProps {
 }
 
 export default function OwnerLoginPage({ onLogin, onCreateAccount, onHome }: OwnerLoginPageProps) {
+  const authService = useAuthService();
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
 
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault();
-    const owner = loginOwner(phone);
+    const owner = await authService.loginOwnerWithPhone(phone);
     if (!owner) {
       setError("لم نجد حسابًا بهذا الرقم. يمكنك إنشاء حساب جديد خلال أقل من دقيقة.");
       return;

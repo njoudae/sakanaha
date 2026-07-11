@@ -44,7 +44,7 @@ Expected future commands after M2:
 3. Staging with internal users.
 4. Staging with migration dry run where relevant.
 5. Production dark launch.
-6. Tenant or cohort rollout.
+6. Cohort, role, owner, service provider, or region rollout.
 7. Full rollout after monitoring confirms stability.
 
 ## Rollback Strategy

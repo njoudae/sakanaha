@@ -16,11 +16,14 @@
     "format:check": "prettier . --check"
   },
   "dependencies": {
+    "@auth/core": "^0.41.2",
+    "@convex-dev/auth": "^0.0.94",
     "@saknaha/constants": "0.1.0",
     "@saknaha/shared-types": "0.1.0",
     "@saknaha/utils": "0.1.0",
     "@types/leaflet": "^1.9.21",
     "@vitejs/plugin-react": "^5.0.0",
+    "convex": "^1.42.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",

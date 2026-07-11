@@ -7,4 +7,6 @@ vite-dev.err
 apps/*/vite-dev.log
 apps/*/vite-dev.err
 .env
+.env.local
+.env.*.local
 .DS_Store

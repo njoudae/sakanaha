@@ -18,7 +18,7 @@ import UserLocationPage from "./pages/UserLocationPage";
 import UserLoginPage from "./pages/UserLoginPage";
 import UserRegisterPage from "./pages/UserRegisterPage";
 import UserSearchPage from "./pages/UserSearchPage";
-import { getCurrentOwner, getCurrentUser, logoutOwner } from "./services/userService";
+import { useAuthService } from "./auth";
 import type { Owner, Property, UniversityLocation, User } from "@saknaha/shared-types";
 
 type Route =
@@ -82,13 +82,14 @@ function publicPathFor(state: RouteState) {
 }
 
 export default function App() {
-  const initialPublicRoute = useMemo(parsePublicPath, []);
+  const authService = useAuthService();
+  const initialPublicRoute = useMemo(() => parsePublicPath(), []);
   const [route, setRoute] = useState<Route>(initialPublicRoute.route);
   const [cityName, setCityName] = useState(initialPublicRoute.cityName ?? "");
   const [propertyId, setPropertyId] = useState(initialPublicRoute.propertyId ?? "");
   const [requestId, setRequestId] = useState(initialPublicRoute.requestId ?? "");
-  const [owner, setOwner] = useState<Owner | null>(() => getCurrentOwner());
-  const [user, setUser] = useState<User | null>(() => getCurrentUser());
+  const [owner, setOwner] = useState<Owner | null>(() => authService.getCurrentOwner());
+  const [user, setUser] = useState<User | null>(() => authService.getCurrentUser());
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [selectedUniversity, setSelectedUniversity] = useState<UniversityLocation | null>(null);
   const [pendingUserRoute, setPendingUserRoute] = useState<RouteState | null>(null);
@@ -234,8 +235,8 @@ export default function App() {
     document.getElementById("cities")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  function handleOwnerLogout() {
-    logoutOwner();
+  async function handleOwnerLogout() {
+    await authService.logout();
     setOwner(null);
     setEditingProperty(null);
     navigatePublic({ route: "landing" });
