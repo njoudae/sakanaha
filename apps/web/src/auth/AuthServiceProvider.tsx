@@ -14,6 +14,7 @@ import {
   loginOwner,
   loginUser,
   logoutOwner,
+  logoutUser,
   registerOwner,
   registerUser,
 } from "../services/userService";
@@ -63,6 +64,7 @@ function ConvexAuthServiceBridge({
         await recordAuthEvent({ event: "logout" });
         await signOut();
         logoutOwner();
+        logoutUser();
       },
       signInWithGoogle: async () => {
         if (!flags["auth.google.enabled"]) {

@@ -5,9 +5,12 @@ import type {
   Interest,
   NegotiationSignal,
   Property,
+  PropertyView,
+  RoommateJoinRequest,
   PropertyStatus,
   RoommatePreference,
   RoommateRequest,
+  RoommateRequestView,
   ServiceNearby,
 } from "@saknaha/shared-types";
 import { makeId, readStorage, writeStorage } from "./storage";
@@ -18,6 +21,9 @@ const FAVORITE_KEY = "saknaha.favorites";
 const ROOMMATE_KEY = "saknaha.roommates";
 const ROOMMATE_REQUEST_KEY = "saknaha.roommateRequests";
 const NEGOTIATION_KEY = "saknaha.negotiations";
+const PROPERTY_VIEW_KEY = "saknaha.propertyViews";
+const ROOMMATE_VIEW_KEY = "saknaha.roommateViews";
+const ROOMMATE_JOIN_REQUEST_KEY = "saknaha.roommateJoinRequests";
 
 export function getProperties(): Property[] {
   const saved = readStorage<Property[]>(PROPERTY_KEY, []);
@@ -91,6 +97,17 @@ export function getOwnerProperties(ownerId: string): Property[] {
   return getProperties().filter((property) => property.ownerId === ownerId);
 }
 
+export function getOwnerInterests(ownerId: string): Interest[] {
+  const ownerPropertyIds = new Set(getOwnerProperties(ownerId).map((property) => property.id));
+  return readStorage<Interest[]>(INTEREST_KEY, []).filter((interest) =>
+    ownerPropertyIds.has(interest.propertyId),
+  );
+}
+
+export function getUserInterests(userId: string): Interest[] {
+  return readStorage<Interest[]>(INTEREST_KEY, []).filter((interest) => interest.userId === userId);
+}
+
 export function saveProperty(property: Property): Property {
   const properties = getProperties();
   const nextProperty = property.id
@@ -119,6 +136,15 @@ export function addInterest(input: Omit<Interest, "id" | "createdAt">): Interest
   };
   writeStorage(INTEREST_KEY, [interest, ...readStorage<Interest[]>(INTEREST_KEY, [])]);
   return interest;
+}
+
+export function removeUserInterest(userId: string, propertyId: string): void {
+  writeStorage(
+    INTEREST_KEY,
+    readStorage<Interest[]>(INTEREST_KEY, []).filter(
+      (interest) => !(interest.userId === userId && interest.propertyId === propertyId),
+    ),
+  );
 }
 
 export function getFavorites(userId = "guest-user"): FavoriteProperty[] {
@@ -158,6 +184,15 @@ export function toggleFavoriteProperty(property: Property, userId = "guest-user"
   return true;
 }
 
+export function removeFavoriteProperty(propertyId: string, userId = "guest-user"): void {
+  writeStorage(
+    FAVORITE_KEY,
+    readStorage<FavoriteProperty[]>(FAVORITE_KEY, []).filter(
+      (favorite) => !(favorite.userId === userId && favorite.propertyId === propertyId),
+    ),
+  );
+}
+
 export function addRoommatePreference(
   input: Omit<RoommatePreference, "id" | "createdAt">,
 ): RoommatePreference {
@@ -175,6 +210,7 @@ function demoRoommateRequests(): RoommateRequest[] {
     {
       propertyId: "mock-badee",
       userType: "student" as const,
+      requesterName: "أريج",
       age: 21,
       organization: "جامعة الملك خالد - قريقر",
       major: "حاسب",
@@ -185,6 +221,7 @@ function demoRoommateRequests(): RoommateRequest[] {
     {
       propertyId: "mock-nuzhah",
       userType: "employee" as const,
+      requesterName: "نورة",
       age: 25,
       organization: "مقر عمل في أبها",
       major: "",
@@ -195,6 +232,7 @@ function demoRoommateRequests(): RoommateRequest[] {
     {
       propertyId: "mock-king-road",
       userType: "student" as const,
+      requesterName: "رهف",
       age: 22,
       organization: "جامعة الملك خالد - طريق الملك",
       major: "إدارة أعمال",
@@ -235,6 +273,219 @@ export function addRoommateRequest(
   };
   writeStorage(ROOMMATE_REQUEST_KEY, [request, ...getRoommateRequests()]);
   return request;
+}
+
+export function updateRoommateCard(
+  requestId: string,
+  userId: string,
+  input: {
+    city: string;
+    neighborhood: string;
+    availableRooms: number;
+    pricePerPerson: number;
+    organization: string;
+    bio: string;
+  },
+): RoommateRequest | null {
+  const savedRequests = readStorage<RoommateRequest[]>(ROOMMATE_REQUEST_KEY, []);
+  const existingRequest = savedRequests.find((request) => request.id === requestId);
+  if (!existingRequest || existingRequest.userId !== userId) return null;
+
+  const availableRooms = Math.max(1, input.availableRooms);
+  const updatedRequest: RoommateRequest = {
+    ...existingRequest,
+    availableRooms,
+    organization: input.organization.trim(),
+    bio: input.bio.trim(),
+  };
+
+  writeStorage(
+    ROOMMATE_REQUEST_KEY,
+    savedRequests.map((request) => (request.id === requestId ? updatedRequest : request)),
+  );
+
+  const properties = getProperties();
+  const property = properties.find((item) => item.id === existingRequest.propertyId);
+  if (property && property.ownerId === userId) {
+    const updatedProperty: Property = {
+      ...property,
+      city: input.city.trim(),
+      neighborhood: input.neighborhood.trim(),
+      address: input.neighborhood.trim(),
+      universityNearby: input.organization.trim() || property.universityNearby,
+      minRooms: availableRooms,
+      maxRooms: availableRooms,
+      maxResidents: availableRooms,
+      price: Math.max(1, input.pricePerPerson) * availableRooms,
+    };
+    writeStorage(
+      PROPERTY_KEY,
+      properties.map((item) => (item.id === updatedProperty.id ? updatedProperty : item)),
+    );
+  }
+
+  return updatedRequest;
+}
+
+export function deleteRoommateCard(requestId: string, userId: string): boolean {
+  const savedRequests = readStorage<RoommateRequest[]>(ROOMMATE_REQUEST_KEY, []);
+  const target = savedRequests.find((request) => request.id === requestId);
+  if (!target || target.userId !== userId) return false;
+
+  const nextRequests = savedRequests.filter((request) => request.id !== requestId);
+  writeStorage(ROOMMATE_REQUEST_KEY, nextRequests);
+  writeStorage(
+    ROOMMATE_JOIN_REQUEST_KEY,
+    readStorage<RoommateJoinRequest[]>(ROOMMATE_JOIN_REQUEST_KEY, []).filter(
+      (request) => request.requestId !== requestId,
+    ),
+  );
+  writeStorage(
+    ROOMMATE_VIEW_KEY,
+    readStorage<RoommateRequestView[]>(ROOMMATE_VIEW_KEY, []).filter(
+      (view) => view.requestId !== requestId,
+    ),
+  );
+
+  const properties = getProperties();
+  const property = properties.find((item) => item.id === target.propertyId);
+  const hasOtherRequestForProperty = nextRequests.some(
+    (request) => request.propertyId === target.propertyId,
+  );
+  if (
+    property &&
+    property.ownerId === userId &&
+    property.propertyLicenseNumber === "external-roommate-card" &&
+    !hasOtherRequestForProperty
+  ) {
+    writeStorage(
+      PROPERTY_KEY,
+      properties.filter((item) => item.id !== property.id),
+    );
+  }
+
+  return true;
+}
+
+export function recordPropertyView(propertyId: string, userId = "guest-user"): void {
+  if (!propertyId) return;
+  const view: PropertyView = {
+    id: makeId("property-view"),
+    propertyId,
+    userId,
+    createdAt: new Date().toISOString(),
+  };
+  writeStorage(PROPERTY_VIEW_KEY, [view, ...readStorage<PropertyView[]>(PROPERTY_VIEW_KEY, [])]);
+}
+
+export function recordRoommateRequestView(requestId: string, userId = "guest-user"): void {
+  if (!requestId) return;
+  const view: RoommateRequestView = {
+    id: makeId("roommate-view"),
+    requestId,
+    userId,
+    createdAt: new Date().toISOString(),
+  };
+  writeStorage(ROOMMATE_VIEW_KEY, [
+    view,
+    ...readStorage<RoommateRequestView[]>(ROOMMATE_VIEW_KEY, []),
+  ]);
+}
+
+export function addRoommateJoinRequest(input: {
+  requestId: string;
+  requesterUserId: string;
+  requesterName: string;
+}): RoommateJoinRequest | null {
+  const targetRequest = getRoommateRequestById(input.requestId);
+  if (!targetRequest || targetRequest.userId === input.requesterUserId) return null;
+  const existing = readStorage<RoommateJoinRequest[]>(ROOMMATE_JOIN_REQUEST_KEY, []).find(
+    (request) =>
+      request.requestId === input.requestId && request.requesterUserId === input.requesterUserId,
+  );
+  if (existing) return existing;
+
+  const now = new Date().toISOString();
+  const joinRequest: RoommateJoinRequest = {
+    id: makeId("roommate-join"),
+    requestId: input.requestId,
+    propertyId: targetRequest.propertyId,
+    requesterUserId: input.requesterUserId,
+    requesterName: input.requesterName,
+    ownerUserId: targetRequest.userId,
+    status: "pending",
+    createdAt: now,
+    updatedAt: now,
+  };
+  writeStorage(ROOMMATE_JOIN_REQUEST_KEY, [
+    joinRequest,
+    ...readStorage<RoommateJoinRequest[]>(ROOMMATE_JOIN_REQUEST_KEY, []),
+  ]);
+  return joinRequest;
+}
+
+export function updateRoommateJoinRequestStatus(
+  id: string,
+  status: RoommateJoinRequest["status"],
+): void {
+  const now = new Date().toISOString();
+  const next = readStorage<RoommateJoinRequest[]>(ROOMMATE_JOIN_REQUEST_KEY, []).map((request) =>
+    request.id === id ? { ...request, status, updatedAt: now } : request,
+  );
+  writeStorage(ROOMMATE_JOIN_REQUEST_KEY, next);
+}
+
+export function getUserActivity(userId: string) {
+  const properties = getProperties();
+  const propertiesById = new Map(properties.map((property) => [property.id, property]));
+  const roommateRequests = getRoommateRequests();
+  const roommateRequestsById = new Map(roommateRequests.map((request) => [request.id, request]));
+  const roommateViews = readStorage<RoommateRequestView[]>(ROOMMATE_VIEW_KEY, []);
+  const propertyViews = readStorage<PropertyView[]>(PROPERTY_VIEW_KEY, []);
+  const joinRequests = readStorage<RoommateJoinRequest[]>(ROOMMATE_JOIN_REQUEST_KEY, []);
+
+  const favorites = getFavorites(userId).map((favorite) => ({
+    favorite,
+    property: propertiesById.get(favorite.propertyId) ?? null,
+  }));
+  const interests = getUserInterests(userId).map((interest) => ({
+    interest,
+    property: propertiesById.get(interest.propertyId) ?? null,
+  }));
+  const roommateCards = roommateRequests
+    .filter((request) => request.userId === userId)
+    .map((request) => {
+      const incomingRequests = joinRequests.filter((item) => item.requestId === request.id);
+      return {
+        request,
+        property: propertiesById.get(request.propertyId) ?? null,
+        views: roommateViews.filter((view) => view.requestId === request.id).length,
+        incomingRequests,
+      };
+    });
+  const sentJoinRequests = joinRequests
+    .map((request) => ({
+      joinRequest: request,
+      roommateRequest: roommateRequestsById.get(request.requestId) ?? null,
+      property: propertiesById.get(request.propertyId) ?? null,
+    }))
+    .filter((item) => item.joinRequest.requesterUserId === userId);
+
+  return {
+    favorites,
+    interests,
+    roommateCards,
+    sentJoinRequests,
+    viewedProperties: propertyViews
+      .filter((view) => view.userId === userId)
+      .map((view) => ({ view, property: propertiesById.get(view.propertyId) ?? null })),
+    viewedRoommateRequests: roommateViews
+      .filter((view) => view.userId === userId)
+      .map((view) => ({
+        view,
+        roommateRequest: roommateRequestsById.get(view.requestId) ?? null,
+      })),
+  };
 }
 
 export function addNegotiationSignal(

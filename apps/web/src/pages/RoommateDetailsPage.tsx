@@ -10,17 +10,23 @@ import {
   UserRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { mockUniversities } from "@saknaha/constants/mockUniversities";
-import { getPropertyById, getRoommateRequestById } from "../services/propertyService";
-import type { Property, UniversityLocation } from "@saknaha/shared-types";
+import {
+  addRoommateJoinRequest,
+  getPropertyById,
+  getRoommateRequestById,
+  recordRoommateRequestView,
+} from "../services/propertyService";
+import type { Property, UniversityLocation, User } from "@saknaha/shared-types";
 
 interface RoommateDetailsPageProps {
   requestId: string;
+  user: User | null;
   onBack: () => void;
 }
 
-export default function RoommateDetailsPage({ requestId, onBack }: RoommateDetailsPageProps) {
+export default function RoommateDetailsPage({ requestId, user, onBack }: RoommateDetailsPageProps) {
   const request = getRoommateRequestById(requestId);
   const property = request ? getPropertyById(request.propertyId) : null;
   const universities = useMemo(
@@ -31,6 +37,10 @@ export default function RoommateDetailsPage({ requestId, onBack }: RoommateDetai
   const [selectedUniversityId, setSelectedUniversityId] = useState(universities[0]?.id ?? "");
   const [activeImage, setActiveImage] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
+
+  useEffect(() => {
+    recordRoommateRequestView(requestId, user?.id ?? "guest-user");
+  }, [requestId, user?.id]);
 
   if (!request || !property) {
     return (
@@ -163,13 +173,25 @@ export default function RoommateDetailsPage({ requestId, onBack }: RoommateDetai
             </div>
           </div>
 
-          <button className="primary-button mt-5 w-full" onClick={() => setConfirmed(true)}>
+          <button
+            className="primary-button mt-5 w-full"
+            onClick={() => {
+              if (!user) return;
+              addRoommateJoinRequest({
+                requestId: request.id,
+                requesterUserId: user.id,
+                requesterName: user.name,
+              });
+              setConfirmed(true);
+            }}
+            disabled={!user || request.userId === user.id}
+          >
             <Check size={18} aria-hidden="true" />
-            تأكيد الاهتمام
+            {request.userId === user?.id ? "هذه بطاقتك" : "تأكيد طلب الانضمام"}
           </button>
           {confirmed ? (
             <p className="mt-3 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-mintdeep">
-              تم تسجيل اهتمامك. التواصل المباشر قريبًا في النسخة القادمة.
+              تم إرسال طلب الانضمام. سيظهر في لوحة تحكمك، ويظهر لصاحبة البطاقة لقبوله أو رفضه.
             </p>
           ) : null}
         </div>

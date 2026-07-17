@@ -9,10 +9,13 @@ export const distanceUnitLabels: Record<DistanceUnit, string> = {
 };
 
 export function formatRooms(property: Pick<Property, "minRooms" | "maxRooms">): string {
-  if (property.minRooms === property.maxRooms) {
-    return `${property.minRooms.toLocaleString("ar-SA")} ${property.minRooms === 1 ? "غرفة" : "غرف"}`;
+  const minRooms = Math.min(property.minRooms, property.maxRooms);
+  const maxRooms = Math.max(property.minRooms, property.maxRooms);
+
+  if (minRooms === maxRooms) {
+    return `${minRooms.toLocaleString("ar-SA")} ${minRooms === 1 ? "غرفة" : "غرف"}`;
   }
-  return `${property.minRooms.toLocaleString("ar-SA")} - ${property.maxRooms.toLocaleString("ar-SA")} غرف`;
+  return `${minRooms.toLocaleString("ar-SA")} - ${maxRooms.toLocaleString("ar-SA")} غرف`;
 }
 
 export function formatServiceDistance(service: ServiceNearby): string {

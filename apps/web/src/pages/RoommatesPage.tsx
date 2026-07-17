@@ -1,10 +1,20 @@
-import { BedDouble, DoorOpen, GraduationCap, MapPin, Receipt, UserRound } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { getPropertyById, getRoommateRequests } from "../services/propertyService";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useMemo, useState } from "react";
+import { cityNames } from "@saknaha/constants/cities";
+import RoommateListingCard from "../components/RoommateListingCard";
+import {
+  getPropertyById,
+  getPublishedProperties,
+  getRoommateRequests,
+} from "../services/propertyService";
 import type { Property, RoommateRequest } from "@saknaha/shared-types";
 
 interface RoommatesPageProps {
   onDetails: (requestId: string) => void;
+  onProperty: (propertyId: string) => void;
+  onHousing: () => void;
+  onHome: () => void;
+  initialCity?: string;
 }
 
 interface RoommateListing {
@@ -12,141 +22,122 @@ interface RoommateListing {
   property: Property;
 }
 
-export default function RoommatesPage({ onDetails }: RoommatesPageProps) {
-  const listings = getRoommateRequests()
-    .map((request) => {
-      const property = getPropertyById(request.propertyId);
-      return property ? { request, property } : null;
-    })
-    .filter(Boolean) as RoommateListing[];
+export default function RoommatesPage({
+  onDetails,
+  onProperty,
+  onHousing,
+  onHome,
+  initialCity = "all",
+}: RoommatesPageProps) {
+  const [city, setCity] = useState(initialCity);
 
-  const city = listings[0]?.property.city ?? "أبها";
+  const listings = useMemo(() => {
+    return getRoommateRequests()
+      .map((request) => {
+        const property = getPropertyById(request.propertyId);
+        return property ? { request, property } : null;
+      })
+      .filter((listing): listing is RoommateListing => {
+        if (!listing) return false;
+        if (city !== "all" && listing.property.city !== city) return false;
+        return true;
+      });
+  }, [city]);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-12">
-      <header className="mb-8 text-center">
-        <p className="text-sm font-black text-berry">شريكة سكن</p>
-        <h1 className="mt-2 text-3xl font-black text-ink md:text-4xl">شريك سكن في {city}</h1>
-        <p className="mx-auto mt-3 max-w-2xl text-sm font-bold leading-8 text-stone-600 md:text-base">
-          بطاقات مختصرة لوحدات سكنية تبحث ساكناتها عن شريكات. افتحي التفاصيل لمراجعة السكن والصور
-          والمسافة.
-        </p>
+    <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-12" dir="rtl">
+      <button
+        className="mb-6 inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-black text-ink shadow-sm transition hover:border-berry hover:text-berry"
+        onClick={onHome}
+        type="button"
+      >
+        <ArrowRight size={17} aria-hidden="true" />
+        الرجوع للصفحة الرئيسية
+      </button>
+
+      <header className="mb-7 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+        <div className="text-right">
+          <p className="text-sm font-black uppercase tracking-wide text-berry">شريكات السكن</p>
+          <h1 className="mt-2 text-3xl font-black text-ink md:text-4xl">
+            سيدات قمن باستئجار سكن وبحاجة لشريكات سكن
+          </h1>
+        </div>
+
+        <div className="rounded-2xl border border-stone-200 bg-white/90 p-4 text-right shadow-sm">
+          <p className="mb-3 text-sm font-black text-ink">فلتر المدينة</p>
+          <label>
+            <span className="label">المدينة</span>
+            <select
+              className="field field-select"
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+            >
+              <option value="all">كل المدن</option>
+              {cityNames.map((cityName) => (
+                <option key={cityName} value={cityName}>
+                  {cityName}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </header>
 
       {listings.length === 0 ? (
         <div className="panel text-center">
-          <h2 className="text-xl font-black text-ink">لا توجد طلبات حالياً</h2>
-          <p className="mt-2 text-sm font-bold text-stone-600">
-            يمكنك فتح تفاصيل أي سكن وتسجيل طلب شريكة سكن.
-          </p>
+          <h2 className="text-xl font-black text-ink">لا توجد فرص مطابقة</h2>
+          <p className="mt-2 text-sm font-bold text-stone-600">جربي مدينة أخرى.</p>
         </div>
       ) : (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {listings.map((listing) => (
-            <RoommateCard key={listing.request.id} listing={listing} onDetails={onDetails} />
+            <RoommateListingCard key={listing.request.id} listing={listing} onDetails={onDetails} />
           ))}
         </section>
       )}
-    </main>
-  );
-}
 
-function RoommateCard({
-  listing,
-  onDetails,
-}: {
-  listing: RoommateListing;
-  onDetails: (requestId: string) => void;
-}) {
-  const { property, request } = listing;
-  const pricePerPerson = Math.ceil(property.price / Math.max(1, property.maxResidents));
-
-  return (
-    <article className="rounded-3xl border border-stone-100 bg-white/95 p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-black text-ink">{property.title}</h2>
-          <p className="mt-2 flex items-center gap-2 text-sm font-bold text-stone-600">
-            <MapPin size={16} aria-hidden="true" />
-            {property.neighborhood} - {property.city}
-          </p>
+      <section className="mt-12 border-y border-stone-200 py-8 text-right">
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-black text-berry">خيارات السكن</p>
+            <h2 className="text-2xl font-black text-ink">
+              لم تجدي شريكة مناسبة؟ احجزي السكن الخاص بك
+            </h2>
+          </div>
+          <button
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-berry shadow-sm transition hover:border-berry hover:bg-linen"
+            onClick={onHousing}
+            type="button"
+            aria-label="عرض صفحة خيارات السكن كاملة"
+          >
+            <ArrowLeft size={20} aria-hidden="true" />
+          </button>
         </div>
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-mintdeep">
-          <UserRound size={24} aria-hidden="true" />
-        </span>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Chip>{request.userType === "student" ? "طالبة" : "موظفة"}</Chip>
-        <Chip>تبحث عن شريكة</Chip>
-        <Chip>{request.moveInDate}</Chip>
-      </div>
-
-      <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-        <Fact icon={GraduationCap} label="الجامعة أو جهة العمل" value={request.organization} />
-        <Fact
-          icon={Receipt}
-          label="السعر الكلي"
-          value={`${property.price.toLocaleString("ar-SA")} ريال`}
-        />
-        <Fact
-          icon={UserRound}
-          label="سعر الفرد المتوقع"
-          value={`${pricePerPerson.toLocaleString("ar-SA")} ريال`}
-          highlight
-        />
-        <Fact
-          icon={BedDouble}
-          label="الغرف الكلي"
-          value={`${property.maxRooms.toLocaleString("ar-SA")} غرف`}
-        />
-        <Fact
-          icon={DoorOpen}
-          label="الغرف المتاحة"
-          value={`${request.availableRooms.toLocaleString("ar-SA")} غرفة`}
-        />
-      </div>
-
-      <div className="mt-4 rounded-2xl bg-linen p-3">
-        <p className="text-xs font-bold text-stone-500">نبذة مختصرة</p>
-        <p className="mt-1 line-clamp-2 text-sm font-bold leading-7 text-stone-700">
-          {request.bio}
-        </p>
-      </div>
-
-      <button className="primary-button mt-4 w-full" onClick={() => onDetails(request.id)}>
-        التفاصيل
-      </button>
-    </article>
-  );
-}
-
-function Chip({ children }: { children: string }) {
-  return (
-    <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-black text-stone-600">
-      {children}
-    </span>
-  );
-}
-
-function Fact({
-  icon: Icon,
-  label,
-  value,
-  highlight = false,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl bg-linen p-3">
-      <p className="flex items-center gap-2 text-xs font-bold text-stone-500">
-        <Icon size={15} aria-hidden="true" />
-        {label}
-      </p>
-      <p className={`mt-1 font-black ${highlight ? "text-lg text-berry" : "text-ink"}`}>{value}</p>
-    </div>
+        <div className="flex gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {getPublishedProperties()
+            .slice(0, 8)
+            .map((property) => (
+              <button
+                key={property.id}
+                className="w-72 shrink-0 rounded-2xl border border-stone-200 bg-white p-3 text-right shadow-sm transition hover:border-berry"
+                onClick={() => onProperty(property.id)}
+                type="button"
+              >
+                <img
+                  src={property.images[0]}
+                  alt={property.title}
+                  className="h-32 w-full rounded-xl object-cover"
+                />
+                <h3 className="mt-3 line-clamp-1 text-lg font-black text-ink">
+                  {property.city}، {property.neighborhood}
+                </h3>
+                <p className="mt-2 font-black text-ink">
+                  {property.price.toLocaleString("ar-SA")} ر.س / شهر
+                </p>
+              </button>
+            ))}
+        </div>
+      </section>
+    </main>
   );
 }

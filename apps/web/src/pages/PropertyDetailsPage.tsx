@@ -13,6 +13,7 @@ import {
   Video,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useEffect } from "react";
 import Badge from "../components/Badge";
 import RoommateRequestForm from "../components/RoommateRequestForm";
 import {
@@ -22,6 +23,7 @@ import {
   getProperties,
   getPropertyById,
   isFavoriteProperty,
+  recordPropertyView,
   toggleFavoriteProperty,
 } from "../services/propertyService";
 import type { Property, User } from "@saknaha/shared-types";
@@ -76,6 +78,10 @@ export default function PropertyDetailsPage({
   const [favorite, setFavorite] = useState(() =>
     property ? isFavoriteProperty(property.id, userId) : false,
   );
+
+  useEffect(() => {
+    if (property && !isOwnerPreview) recordPropertyView(property.id, userId);
+  }, [isOwnerPreview, property, userId]);
 
   const sameCityProperties = useMemo(() => {
     if (!property) return [];

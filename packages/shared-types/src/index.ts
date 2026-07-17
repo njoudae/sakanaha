@@ -10,7 +10,10 @@ export type DistanceUnit = "meter" | "kilometer" | "walking_minutes" | "driving_
 export interface Owner {
   id: string;
   fullName: string;
+  email?: string;
   phone: string;
+  nationalId?: string;
+  region?: string;
   ministryPropertyNumber: string;
   createdAt: string;
 }
@@ -18,6 +21,7 @@ export interface Owner {
 export interface User {
   id: string;
   name: string;
+  email?: string;
   phone: string;
   role: UserRole;
   city: string;
@@ -106,6 +110,7 @@ export interface RoommateRequest {
   id: string;
   propertyId: string;
   userId: string;
+  requesterName?: string;
   userType: UserRole;
   age: number;
   organization: string;
@@ -114,6 +119,32 @@ export interface RoommateRequest {
   bio: string;
   availableRooms: number;
   createdAt: string;
+}
+
+export interface PropertyView {
+  id: string;
+  userId: string;
+  propertyId: string;
+  createdAt: string;
+}
+
+export interface RoommateRequestView {
+  id: string;
+  userId: string;
+  requestId: string;
+  createdAt: string;
+}
+
+export interface RoommateJoinRequest {
+  id: string;
+  requestId: string;
+  propertyId: string;
+  requesterUserId: string;
+  requesterName: string;
+  ownerUserId: string;
+  status: "pending" | "accepted" | "rejected";
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface NegotiationSignal {

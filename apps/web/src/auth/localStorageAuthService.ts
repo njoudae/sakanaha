@@ -5,6 +5,7 @@ import {
   loginOwner,
   loginUser,
   logoutOwner,
+  logoutUser,
   registerOwner,
   registerUser,
 } from "../services/userService";
@@ -26,6 +27,7 @@ export const localStorageAuthService: AuthService = {
   registerUser: async (input) => registerUser(input),
   logout: async () => {
     logoutOwner();
+    logoutUser();
   },
   signInWithGoogle: async () => {
     throw new Error("Google login is not enabled.");

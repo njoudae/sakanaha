@@ -7,7 +7,8 @@
 :root {
   color: #1f2937;
   background: #fbf7f2;
-  font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Segoe UI", Arial, sans-serif;
+  font-family:
+    "IBM Plex Sans Arabic", "IBM Plex Arabic", "Noto Sans Arabic", "Segoe UI", Arial, sans-serif;
 }
 
 * {
@@ -17,6 +18,8 @@
 html {
   scroll-behavior: smooth;
   overflow-x: clip;
+  font-family:
+    "IBM Plex Sans Arabic", "IBM Plex Arabic", "Noto Sans Arabic", "Segoe UI", Arial, sans-serif;
 }
 
 body {
@@ -25,6 +28,8 @@ body {
   min-height: 100vh;
   direction: rtl;
   overflow-x: clip;
+  font-family:
+    "IBM Plex Sans Arabic", "IBM Plex Arabic", "Noto Sans Arabic", "Segoe UI", Arial, sans-serif;
   background:
     radial-gradient(circle at top right, rgba(184, 107, 90, 0.14), transparent 32rem),
     linear-gradient(135deg, #fbf7f2 0%, #eef7f5 48%, #f7f0f7 100%);
@@ -35,6 +40,8 @@ body {
   width: 100%;
   max-width: 100vw;
   overflow-x: clip;
+  font-family:
+    "IBM Plex Sans Arabic", "IBM Plex Arabic", "Noto Sans Arabic", "Segoe UI", Arial, sans-serif;
 }
 
 button,

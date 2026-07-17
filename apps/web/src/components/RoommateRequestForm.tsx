@@ -30,6 +30,7 @@ export default function RoommateRequestForm({ property, user, onDone }: Roommate
     addRoommateRequest({
       propertyId: property.id,
       userId: user?.id ?? "guest-user",
+      requesterName: user?.name,
       userType,
       age: Number(age),
       organization: organization.trim(),
