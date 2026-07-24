@@ -77,8 +77,13 @@ async function main() {
   const vercel = JSON.parse(await readFile("vercel.json", "utf8"));
   if (vercel.outputDirectory !== "apps/web/dist")
     throw new Error("Unexpected Vercel output directory.");
-  if (vercel.buildCommand !== "npm run typecheck && npm run build") {
-    throw new Error("Vercel builds must not deploy Convex implicitly.");
+  const vercelBuildCommand = vercel.buildCommand ?? "";
+  if (
+    !vercelBuildCommand.includes("npx convex deploy") ||
+    !vercelBuildCommand.includes("--cmd-url-env-var-name VITE_CONVEX_URL") ||
+    !vercelBuildCommand.includes('--cmd "npm run typecheck && npm run build"')
+  ) {
+    throw new Error("Vercel builds must deploy Convex before building the matching frontend.");
   }
   const globalHeaders = vercel.headers?.find((entry) => entry.source === "/(.*)")?.headers ?? [];
   const headerNames = new Set(globalHeaders.map((header) => header.key));
