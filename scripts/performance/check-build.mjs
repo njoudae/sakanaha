@@ -5,9 +5,10 @@ import { basename, resolve } from "node:path";
 
 const DIST_DIRECTORY = resolve("apps/web/dist");
 const ASSETS_DIRECTORY = resolve(DIST_DIRECTORY, "assets");
+const convexAuthEnabled = process.env.VITE_FEATURE_AUTH_CONVEX_AUTH_ENABLED === "true";
 const budgets = {
   entryBytes: 100_000,
-  initialGzipBytes: 110_000,
+  initialGzipBytes: convexAuthEnabled ? 125_000 : 110_000,
   largestJavaScriptBytes: 500_000,
   logoBytes: 20_000,
   minimumLazyPageChunks: 15,
