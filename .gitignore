@@ -10,3 +10,6 @@ apps/*/vite-dev.err
 .env.local
 .env.*.local
 .DS_Store
+/backups/
+/restore-work/
+.vercel/

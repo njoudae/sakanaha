@@ -7,7 +7,8 @@ export type FeatureFlagKey =
   | "data.convex.enabled"
   | "data.localStorageExport.enabled"
   | "data.dualRead.enabled"
-  | "data.dualWrite.enabled";
+  | "data.dualWrite.enabled"
+  | "maps.universityDirections.enabled";
 
 export type FeatureFlagMap = Readonly<Record<FeatureFlagKey, boolean>>;
 
@@ -21,6 +22,7 @@ export const defaultFeatureFlags: FeatureFlagMap = {
   "data.localStorageExport.enabled": true,
   "data.dualRead.enabled": false,
   "data.dualWrite.enabled": false,
+  "maps.universityDirections.enabled": true,
 };
 
 function envFlag(name: string): boolean | undefined {
@@ -52,5 +54,8 @@ export function getFeatureFlags(): FeatureFlagMap {
     "data.dualWrite.enabled":
       envFlag("VITE_FEATURE_DATA_DUAL_WRITE_ENABLED") ??
       defaultFeatureFlags["data.dualWrite.enabled"],
+    "maps.universityDirections.enabled":
+      envFlag("VITE_FEATURE_MAPS_UNIVERSITY_DIRECTIONS_ENABLED") ??
+      defaultFeatureFlags["maps.universityDirections.enabled"],
   };
 }

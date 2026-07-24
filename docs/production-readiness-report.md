@@ -1,95 +1,100 @@
-# Production Readiness Report
+# Final production readiness report — M1–M17
 
-This report reflects the repository state after M9 and before the next implementation milestone.
+## Executive conclusion
 
-## Ready
+The approved Saknaha application is code-complete through M17 and has production-grade local quality
+gates, protected CI/CD definitions, environment validation, security hardening, backup/restore
+procedures, performance budgets, deployment health verification, and coordinated rollback
+documentation. No product feature or UI change is included in M17.
 
-- Monorepo quality gates: lint, typecheck, test, and build scripts exist.
-- Vercel frontend deployment shape exists in `vercel.json`.
-- Convex backend folder, schema, generated type boundary, and deployment scripts exist.
-- Convex Auth foundation exists behind `AuthService`.
-- Google Login architecture is implemented behind feature flags.
-- Email OTP architecture is implemented behind feature flags and a secure webhook boundary.
-- Phone OTP architecture is implemented behind feature flags and `SmsProvider`.
-- SMS provider abstraction exists for Msegat, Taqny, and Twilio.
-- SMS idempotency, hashed destination storage, retry policy, provider health, failover, and emergency kill switch are implemented.
-- Maps provider abstraction exists for Google Maps, Mapbox, and OpenStreetMap/OSRM.
-- Maps geocoding, reverse geocoding, route calculation, travel-time calculation, caching, health, and fallback behavior exist at the provider/server boundary.
-- Feature flag baseline is documented.
-- Data migration strategy from localStorage to Convex is documented.
+Production launch still requires operator-owned external configuration: separate cloud projects,
+GitHub environment protections and secrets, DNS/OAuth/provider setup, a successful live staging run,
+manual smoke testing, and a protected production workflow run. Those external actions cannot be
+completed from the repository alone.
 
-## Partially Ready
+## Milestone readiness summary
 
-- Convex data layer exists, but application pages still primarily use localStorage compatibility flows.
-- Auth UI is abstracted through `AuthService`, but production rollout depends on correct Convex Auth and provider environment setup.
-- Email OTP depends on an external webhook; a native email provider adapter is not implemented yet.
-- Phone OTP is server-side and provider-backed, but per-IP rate limiting is fully effective only after a trusted edge proxy or BFF supplies `ipHash`.
-- Google Maps is implemented server-side, but the visible map UI still has legacy/mock-compatible behavior in places.
-- Provider cost events exist for SMS and maps, but the admin cost dashboard is not implemented yet.
-- Convex Storage is selected as the default storage provider, but the secure media upload pipeline is not implemented yet.
+| Milestone | Approved outcome                                                                                                                                                                         |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1        | Existing product and approved user experience established as the compatibility baseline.                                                                                                 |
+| M2        | Monorepo engineering hygiene, workspace commands, linting, typing, testing, and build foundations.                                                                                       |
+| M3        | Data inventory and backward-compatible localStorage-to-Convex migration strategy.                                                                                                        |
+| M4        | Convex schema, validators, indexes, migration boundaries, seed validation, and generated types.                                                                                          |
+| M5        | Authentication service boundary and protected production-auth architecture.                                                                                                              |
+| M6        | Google authentication integration behind the existing feature flags and user flow.                                                                                                       |
+| M7        | Secure Email OTP authentication and delivery boundary.                                                                                                                                   |
+| M8        | SMS provider abstraction, OTP delivery, quotas, retries, failover, health, and kill switch.                                                                                              |
+| M9        | Maps provider abstraction, server actions, caching, quotas, health, and fallback behavior.                                                                                               |
+| M10       | Approved platform workflows, dashboards, routes, location architecture, and production UX baseline.                                                                                      |
+| M11       | Convex Storage media pipeline with secure uploads, validation, thumbnails, covers, retries, metadata, permissions, and cleanup.                                                          |
+| M12       | In-app/email/SMS notifications, preferences, queueing, retries, deep links, and read state.                                                                                              |
+| M13       | Sentry/PostHog-ready monitoring, Web Vitals, privacy-safe analytics, audit logging, and usage inspection.                                                                                |
+| M14       | Backup strategy, validated ZIP/manifest tooling, restore verification, DR runbooks, RPO/RTO, and drills.                                                                                 |
+| M15       | Route splitting, lazy loading, vendor chunking, image/bundle budgets, caching, and production performance optimization.                                                                  |
+| M16       | Server-side authorization review, audit integrity, endpoint/SSRF controls, CSP/security headers, adversarial tests, and clean dependency audit.                                          |
+| M17       | GitHub Actions quality gates, isolated staging/production deployment workflows, environment/secret validation, health checks, release tagging, artifacts, and rollback/failure recovery. |
 
-## Still Mocked Or Compatibility-Based
+## Automated readiness evidence
 
-- Property creation remains on the current frontend/localStorage compatibility path.
-- Property search remains on current frontend/localStorage compatibility data unless Convex data adapters are connected in a later milestone.
-- Favorites remain on current frontend/localStorage compatibility data unless Convex data adapters are connected in a later milestone.
-- Roommate matching remains on current frontend/localStorage compatibility data unless Convex data adapters are connected in a later milestone.
-- Owner dashboard remains on current frontend/localStorage compatibility data unless Convex data adapters are connected in a later milestone.
-- Admin dashboard is not implemented.
-- Media upload, scanning, compression, and thumbnails are not implemented.
-- Push notifications, in-app notifications, queued jobs, Sentry, and PostHog are not implemented.
+- Root gates: lint, typecheck, all tests, security tests, dependency audit, build, performance budget,
+  secret scan, environment validation, workflow/deployment validation, and `git diff --check`.
+- Deployment artifact: hashed Vite assets in `apps/web/dist`; no public source maps unless uploaded
+  and removed by the configured Sentry build integration.
+- Release traceability: exact SHA, environment-specific Convex audit message, immutable Vercel URL,
+  retained `.vercel/output`, semver tag, and GitHub release.
+- Post-deploy checks: SPA shell, route fallback, security headers, hashed asset caching, canonical alias,
+  and Convex function metadata.
 
-## Requires External Accounts
+## Required production deployment steps
 
-- Vercel for frontend staging and production hosting.
-- Convex Cloud for backend staging and production deployments.
-- Google Cloud for OAuth.
-- Google Cloud with Maps Platform enabled for paid maps testing.
-- Email OTP provider or secure webhook endpoint.
-- Msegat for primary SMS.
-- Taqny and Twilio if fallback SMS providers will be tested.
-- DNS provider for staging and production hostnames.
+1. Merge the reviewed M17 repository changes through a pull request whose Quality Gates job passes.
+2. Create dedicated Vercel staging and production projects; disable their automatic Git deployments.
+3. Create dedicated Convex staging and production projects/deployments and least-privilege deploy
+   keys.
+4. Create GitHub `staging` and `production` environments. Add their separate
+   `CONVEX_DEPLOY_KEY`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` secrets and
+   `APP_HEALTH_URL` variable.
+5. Protect `main` and require the `Lint, test, secure, and build` job. Configure production required
+   reviewers, prevent self-approval, and restrict deployment to `main`.
+6. Populate the staging Vercel and Convex environments from `.env.staging.example`. Use only staging
+   OAuth clients, webhook secrets, provider credentials, quotas, monitoring projects, and callbacks.
+7. Merge to `main`. Confirm the automatic Deploy Staging workflow deploys the exact successful SHA
+   and passes both health checks.
+8. Manually verify staging: Google login, Email OTP, optional Phone OTP, user/owner/admin dashboards,
+   property flows, university directions/privacy, media upload/cover/removal, notifications,
+   monitoring events, analytics privacy, provider kill switches, and backup validation.
+9. Populate production environments from `.env.production.example`; configure DNS/TLS, exact OAuth
+   callbacks, quotas, billing alerts, Sentry/PostHog release environments, backup schedules, and
+   incident contacts.
+10. Set `package.json` to the intended release version in a reviewed PR. For the initial current
+    version, the tag is `v0.1.0`.
+11. Dispatch Release Production with the matching semver tag and the full staging-verified SHA.
+    Obtain the independent production-environment approval.
+12. Confirm the workflow reruns all gates, deploys both platforms, verifies immutable and canonical
+    health, retains the artifact, and creates the tag/release only after success.
+13. Monitor Sentry, Web Vitals, audit events, notification/media jobs, provider health/cost, and Vercel
+    logs through the agreed observation window. Record release evidence.
 
-Future external accounts:
+## Remaining recommendations and operational risks
 
-- Sentry for monitoring.
-- PostHog for analytics.
-- Apple Developer account for Apple Sign In.
+- Direct public Convex map actions retain the documented quota-exhaustion residual risk; add an edge
+  WAF/gateway if abuse appears.
+- CSP keeps broad HTTPS connection/image allowances for environment-selectable providers; narrow
+  them after production origins are stable.
+- DNS rebinding defense should be supplemented with provider/network egress controls.
+- Privileged role assignments have status revocation but no expiration timestamp; enforce periodic
+  access reviews.
+- Provider delivery and authentication depend on correctly rotated external secrets and exact
+  callbacks.
+- Production rollback of Convex is a redeployment of the prior source revision, not an instant alias
+  switch; keep the last healthy tag and operator access ready.
+- A live CI/CD run cannot be proven until the workflows are committed and environment secrets exist.
+  Local workflow parsing and all executable repository gates must pass before that first run.
 
-## Cannot Yet Be Fully Tested
+## Go-live decision
 
-- Convex-backed property CRUD from production pages.
-- Convex-backed favorites and roommate matching from production pages.
-- Admin dashboard.
-- Cost dashboard.
-- Secure media upload pipeline.
-- Backup and disaster recovery drills.
-- Monitoring and analytics pipelines.
-- Push/in-app notification delivery.
-- Final Lighthouse >95 production performance target.
-- Full security audit remediation from M15.
+Repository readiness: **ready** after all final M17 gates pass.
 
-## Staging Test Scope Now
-
-After configuring staging accounts and environment variables, the following can be tested:
-
-- App deployment on Vercel.
-- Convex deployment health.
-- Convex Auth client wiring.
-- Google Login.
-- Email OTP through the configured webhook.
-- Phone OTP through Msegat, if enabled.
-- SMS emergency kill switch.
-- Maps server actions with Google Maps, Mapbox, or OpenStreetMap according to configuration.
-- Current property creation/search/favorites/roommate/owner dashboard flows through compatibility storage.
-
-## Recommendation
-
-Deploy staging with conservative flags first:
-
-- Enable Convex Auth only after `VITE_CONVEX_URL` and Convex Auth server variables are set.
-- Enable Google Login first.
-- Enable Email OTP second.
-- Enable Phone OTP only during controlled test windows.
-- Keep Convex data disabled until the data adapter milestone connects pages to backend data.
-- Keep SMS emergency kill switch documented for immediate rollback.
+Operational readiness: **conditional** on completing steps 1–13 above, recording a successful
+staging deployment and smoke test, validating a current backup/recovery point, and obtaining the
+production approval.

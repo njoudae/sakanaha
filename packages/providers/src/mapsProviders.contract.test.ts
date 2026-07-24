@@ -279,4 +279,21 @@ describe("maps provider contract", () => {
       retryable: true,
     });
   });
+
+  it("does not invent route distance or duration when every provider fails", async () => {
+    const unavailable = async () => new JsonResponse({ error: "unavailable" }, false, 503);
+    const primary = createGoogleMapsProvider(
+      { fetch: unavailable },
+      { googleApiKey: "test-google-key" },
+    );
+    const fallback = createOpenStreetMapProvider(
+      { fetch: unavailable },
+      { userAgent: "saknaha-tests" },
+    );
+    const provider = createFallbackMapsProvider(primary, [fallback]);
+
+    await expect(
+      provider.calculateRoute({ lat: 18.2164, lng: 42.5053 }, { lat: 18.25, lng: 42.55 }),
+    ).rejects.toBeDefined();
+  });
 });

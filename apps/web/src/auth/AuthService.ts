@@ -1,4 +1,4 @@
-import type { Owner, User } from "@saknaha/shared-types";
+import type { Owner, UniversityLocation, User } from "@saknaha/shared-types";
 
 export interface AuthCapabilities {
   google: boolean;
@@ -11,6 +11,8 @@ export interface AuthCapabilities {
 export interface AuthService {
   readonly kind: "localStorage" | "convex";
   readonly capabilities: AuthCapabilities;
+  readonly universityBranches: readonly UniversityLocation[];
+  readonly selectedUniversityBranch: UniversityLocation | null;
   getCurrentOwner(): Owner | null;
   getCurrentUser(): User | null;
   loginOwnerWithPhone(phone: string): Promise<Owner | null>;
@@ -24,4 +26,5 @@ export interface AuthService {
   requestPhoneOtp(phone: string): Promise<void>;
   verifyPhoneOtp(phone: string, code: string): Promise<boolean>;
   refreshSession(): Promise<boolean>;
+  saveSelectedUniversityBranch(branchId: string | null): Promise<void>;
 }

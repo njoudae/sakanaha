@@ -1,7 +1,7 @@
 import { ChevronDown, Phone, UserCircle } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { cityNames } from "@saknaha/constants/cities";
-import logo from "../assets/saknaha-logo.png";
+import logo from "../assets/saknaha-logo.webp";
 
 interface AppBarProps {
   onHome: () => void;
@@ -66,7 +66,14 @@ export default function AppBar({
           aria-label="العودة للرئيسية"
           type="button"
         >
-          <img src={logo} alt="سكنها" className="h-12 w-28 object-contain object-right md:w-36" />
+          <img
+            src={logo}
+            alt="سكنها"
+            width="320"
+            height="264"
+            fetchPriority="high"
+            className="h-12 w-28 object-contain object-right md:w-36"
+          />
         </button>
 
         <nav className="hidden items-center gap-1 text-sm font-black text-stone-600 lg:flex">

@@ -2,6 +2,7 @@ import { Email } from "@convex-dev/auth/providers/Email";
 import { Phone } from "@convex-dev/auth/providers/Phone";
 import { convexAuth } from "@convex-dev/auth/server";
 import Google from "@auth/core/providers/google";
+import { assertSecureProviderEndpoint } from "@saknaha/providers";
 import { internal } from "./_generated/api";
 
 const EMAIL_OTP_MAX_AGE_SECONDS = 15 * 60;
@@ -46,11 +47,16 @@ async function postOtpToWebhook(args: {
   token: string;
   expiresAt: number;
 }) {
-  const response = await fetch(args.url, {
+  if (!args.secret) throw new Error("OTP delivery webhook authentication must be configured.");
+  const idempotencyKey = await sha256Hex(
+    `${args.channel}:${args.destination}:${args.token}:${args.expiresAt}`,
+  );
+  const response = await fetch(assertSecureProviderEndpoint(args.url, "OTP webhook endpoint"), {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      ...(args.secret ? { authorization: `Bearer ${args.secret}` } : {}),
+      authorization: `Bearer ${args.secret}`,
+      "idempotency-key": idempotencyKey,
     },
     body: JSON.stringify({
       channel: args.channel,

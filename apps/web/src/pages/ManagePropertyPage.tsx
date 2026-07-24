@@ -20,6 +20,7 @@ export default function ManagePropertyPage({
   const properties = getOwnerProperties(owner.id);
 
   function pause(property: Property) {
+    if ((property.publicationStatus ?? "approved") !== "approved") return;
     updatePropertyStatus(property.id, property.status === "paused" ? "published" : "paused");
     onRefresh();
   }
@@ -41,7 +42,7 @@ export default function ManagePropertyPage({
           </div>
         ) : (
           properties.map((property) => {
-            const googleMapsUrl = getGoogleMapsUrl(property);
+            const googleMapsUrl = getGoogleMapsUrl(property, { canViewExact: true });
             return (
               <article className="panel grid gap-4 lg:grid-cols-[180px_1fr_auto]" key={property.id}>
                 <img
@@ -51,12 +52,8 @@ export default function ManagePropertyPage({
                 />
                 <div>
                   <div className="mb-2 flex flex-wrap gap-2">
-                    <Badge tone={property.status === "published" ? "mint" : "stone"}>
-                      {property.status === "published"
-                        ? "منشور"
-                        : property.status === "draft"
-                          ? "مسودة"
-                          : "متوقف"}
+                    <Badge tone={property.publicationStatus === "approved" ? "mint" : "stone"}>
+                      {publicationStatusLabel(property)}
                     </Badge>
                     <Badge>{property.classification}</Badge>
                     {property.allowWhatsappContact ? <Badge tone="sky">تواصل واتساب</Badge> : null}
@@ -65,6 +62,11 @@ export default function ManagePropertyPage({
                   <p className="mt-2 text-sm font-bold text-stone-600">
                     رقم الرخصة: {property.propertyLicenseNumber}
                   </p>
+                  {property.rejectionReason ? (
+                    <p className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-black text-rose-800">
+                      سبب الرفض أو التعديلات المطلوبة: {property.rejectionReason}
+                    </p>
+                  ) : null}
                   <p className="mt-2 text-sm font-bold text-stone-600">
                     {property.city}، {property.neighborhood} -{" "}
                     {property.price.toLocaleString("ar-SA")} ريال - {formatRooms(property)} -{" "}
@@ -83,7 +85,7 @@ export default function ManagePropertyPage({
                       className="secondary-button mt-3"
                       href={googleMapsUrl}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                     >
                       <MapPinned size={18} aria-hidden="true" />
                       فتح الموقع في Google Maps
@@ -109,10 +111,12 @@ export default function ManagePropertyPage({
                     <Settings size={18} aria-hidden="true" />
                     إدارة
                   </button>
-                  <button className="danger-button" onClick={() => pause(property)}>
-                    <PauseCircle size={18} aria-hidden="true" />
-                    {property.status === "paused" ? "إعادة النشر" : "إيقاف النشر"}
-                  </button>
+                  {(property.publicationStatus ?? "approved") === "approved" ? (
+                    <button className="danger-button" onClick={() => pause(property)}>
+                      <PauseCircle size={18} aria-hidden="true" />
+                      {property.status === "paused" ? "إعادة النشر" : "إيقاف النشر"}
+                    </button>
+                  ) : null}
                 </div>
               </article>
             );
@@ -121,4 +125,15 @@ export default function ManagePropertyPage({
       </div>
     </main>
   );
+}
+
+function publicationStatusLabel(property: Property) {
+  const status =
+    property.publicationStatus ?? (property.status === "published" ? "approved" : "draft");
+  if (status === "pending_review") return "بانتظار المراجعة";
+  if (status === "approved") return property.status === "paused" ? "متوقف" : "منشور";
+  if (status === "rejected") return "مرفوض";
+  if (status === "archived") return "مؤرشف";
+  if (status === "unpublished") return "غير منشور";
+  return "مسودة";
 }

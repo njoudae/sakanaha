@@ -28,6 +28,7 @@ import {
   profileStatus,
   providerCapability,
   providerOperationStatus,
+  publicationStatus,
   quietHours,
   rateLimitScope,
   roleAssignmentStatus,
@@ -46,6 +47,36 @@ export default defineSchema(
   {
     ...authTables,
 
+    universities: defineTable({
+      externalId: v.string(),
+      name: v.string(),
+      region: v.optional(v.string()),
+      city: v.string(),
+      active: v.boolean(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_external_id", ["externalId"])
+      .index("by_active", ["active"])
+      .index("by_city_and_active", ["city", "active"]),
+
+    universityBranches: defineTable({
+      universityId: v.id("universities"),
+      externalId: v.string(),
+      name: v.string(),
+      region: v.optional(v.string()),
+      city: v.string(),
+      latitude: v.number(),
+      longitude: v.number(),
+      active: v.boolean(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_external_id", ["externalId"])
+      .index("by_university_id_and_active", ["universityId", "active"])
+      .index("by_city_and_active", ["city", "active"])
+      .index("by_active", ["active"]),
+
     userProfiles: defineTable({
       authUserId: v.optional(v.id("users")),
       authSubject: v.optional(v.string()),
@@ -58,6 +89,7 @@ export default defineSchema(
       city: v.optional(v.string()),
       monthlyBudget: v.optional(v.number()),
       acceptsRoommate: v.optional(v.boolean()),
+      selectedUniversityBranchId: v.optional(v.id("universityBranches")),
       status: profileStatus,
       createdAt: v.number(),
       updatedAt: v.number(),
@@ -135,13 +167,19 @@ export default defineSchema(
       legacyPropertyId: v.optional(v.string()),
       title: v.string(),
       propertyLicenseNumber: v.string(),
+      region: v.optional(v.string()),
       city: v.string(),
       neighborhood: v.string(),
+      district: v.optional(v.string()),
+      landmark: v.optional(v.string()),
       address: v.string(),
       universityNearby: v.string(),
       googleMapsUrl: v.optional(v.string()),
       lat: v.optional(v.number()),
       lng: v.optional(v.number()),
+      locationVisibility: v.optional(
+        v.union(v.literal("exact"), v.literal("approximate"), v.literal("private")),
+      ),
       geohash: v.optional(v.string()),
       locationQuality,
       classification: v.string(),
@@ -160,12 +198,26 @@ export default defineSchema(
       requiresLeaseContract: v.boolean(),
       price: v.number(),
       paymentType: v.string(),
+      rentalPrices: v.optional(
+        v.object({
+          daily: v.optional(v.number()),
+          weekly: v.optional(v.number()),
+          monthly: v.optional(v.number()),
+          yearly: v.optional(v.number()),
+        }),
+      ),
       negotiable: v.boolean(),
       allowWhatsappContact: v.boolean(),
       deposit: v.optional(v.number()),
       priceNotes: v.optional(v.string()),
       status: listingStatus,
+      publicationStatus: v.optional(publicationStatus),
       moderationStatus,
+      rejectionReason: v.optional(v.string()),
+      submittedAt: v.optional(v.number()),
+      reviewedAt: v.optional(v.number()),
+      reviewedByUserId: v.optional(v.id("userProfiles")),
+      paymentCompleted: v.optional(v.boolean()),
       searchText: v.string(),
       distanceText: v.optional(v.string()),
       timeText: v.optional(v.string()),
@@ -179,6 +231,7 @@ export default defineSchema(
       .index("by_status_city_price", ["status", "city", "price"])
       .index("by_status_city_published", ["status", "city", "publishedAt"])
       .index("by_moderation_status", ["moderationStatus"])
+      .index("by_publication_status", ["publicationStatus"])
       .index("by_legacy_property", ["legacyPropertyId"])
       .index("by_geohash_status", ["geohash", "status"])
       .searchIndex("search_properties", {
@@ -199,10 +252,13 @@ export default defineSchema(
     }).index("by_property", ["propertyId"]),
 
     propertyMedia: defineTable({
-      propertyId: v.id("properties"),
+      propertyId: v.optional(v.id("properties")),
+      uploaderUserId: v.optional(v.id("userProfiles")),
+      provider: v.optional(v.string()),
       storageId: v.optional(v.id("_storage")),
       legacyUrl: v.optional(v.string()),
       kind: mediaKind,
+      originalFileName: v.optional(v.string()),
       mimeType: v.optional(v.string()),
       byteSize: v.optional(v.number()),
       checksum: v.optional(v.string()),
@@ -210,15 +266,25 @@ export default defineSchema(
       height: v.optional(v.number()),
       durationSeconds: v.optional(v.number()),
       thumbnailStorageId: v.optional(v.id("_storage")),
+      thumbnailMimeType: v.optional(v.string()),
+      thumbnailByteSize: v.optional(v.number()),
+      isCover: v.optional(v.boolean()),
       status: mediaStatus,
       scanStatus,
+      uploadExpiresAt: v.optional(v.number()),
+      retryCount: v.optional(v.number()),
+      lastError: v.optional(v.string()),
       sortOrder: v.number(),
       createdAt: v.number(),
       updatedAt: v.number(),
       deletedAt: v.optional(v.number()),
     })
       .index("by_property", ["propertyId"])
+      .index("by_property_and_cover", ["propertyId", "isCover"])
+      .index("by_uploader_and_status", ["uploaderUserId", "status"])
       .index("by_status", ["status"])
+      .index("by_status_and_upload_expires_at", ["status", "uploadExpiresAt"])
+      .index("by_status_and_updated_at", ["status", "updatedAt"])
       .index("by_storage", ["storageId"])
       .index("by_checksum", ["checksum"]),
 
@@ -315,6 +381,18 @@ export default defineSchema(
       moveInDate: v.string(),
       bio: v.string(),
       availableRooms: v.number(),
+      region: v.optional(v.string()),
+      city: v.optional(v.string()),
+      district: v.optional(v.string()),
+      landmark: v.optional(v.string()),
+      universityBranchId: v.optional(v.id("universityBranches")),
+      approximateLat: v.optional(v.number()),
+      approximateLng: v.optional(v.number()),
+      publicationStatus: v.optional(publicationStatus),
+      rejectionReason: v.optional(v.string()),
+      submittedAt: v.optional(v.number()),
+      reviewedAt: v.optional(v.number()),
+      reviewedByUserId: v.optional(v.id("userProfiles")),
       legacyRequestId: v.optional(v.string()),
       status: v.union(
         v.literal("open"),
@@ -331,6 +409,7 @@ export default defineSchema(
       .index("by_user_status", ["userId", "status"])
       .index("by_status_created", ["status", "createdAt"])
       .index("by_moderation_status", ["moderationStatus"])
+      .index("by_publication_status", ["publicationStatus"])
       .index("by_legacy_request", ["legacyRequestId"]),
 
     negotiationSignals: defineTable({
@@ -446,6 +525,7 @@ export default defineSchema(
 
     notifications: defineTable({
       userId: v.id("userProfiles"),
+      idempotencyKey: v.optional(v.string()),
       relatedPropertyId: v.optional(v.id("properties")),
       relatedOwnerProfileId: v.optional(v.id("ownerProfiles")),
       relatedServiceProviderProfileId: v.optional(v.id("serviceProviderProfiles")),
@@ -459,6 +539,8 @@ export default defineSchema(
       createdAt: v.number(),
       readAt: v.optional(v.number()),
     })
+      .index("by_idempotency_key", ["idempotencyKey"])
+      .index("by_user_created", ["userId", "createdAt"])
       .index("by_user_status_created", ["userId", "status", "createdAt"])
       .index("by_property_created", ["relatedPropertyId", "createdAt"])
       .index("by_owner_profile_created", ["relatedOwnerProfileId", "createdAt"])
@@ -469,6 +551,7 @@ export default defineSchema(
     notificationDeliveries: defineTable({
       notificationId: v.id("notifications"),
       userId: v.id("userProfiles"),
+      idempotencyKey: v.optional(v.string()),
       channel: notificationChannel,
       provider: v.optional(v.string()),
       status: deliveryStatus,
@@ -480,6 +563,7 @@ export default defineSchema(
       updatedAt: v.number(),
     })
       .index("by_notification", ["notificationId"])
+      .index("by_idempotency_key", ["idempotencyKey"])
       .index("by_status_next_attempt", ["status", "nextAttemptAt"])
       .index("by_user_channel", ["userId", "channel"])
       .index("by_provider_message", ["provider", "providerMessageId"]),
@@ -580,6 +664,21 @@ export default defineSchema(
       .index("by_owner_profile_created", ["relatedOwnerProfileId", "createdAt"])
       .index("by_service_provider_created", ["relatedServiceProviderProfileId", "createdAt"])
       .index("by_service_offering_created", ["relatedServiceOfferingId", "createdAt"]),
+
+    usageAnalyticsEvents: defineTable({
+      userId: v.id("userProfiles"),
+      name: v.string(),
+      route: v.optional(v.string()),
+      properties: v.optional(
+        v.record(v.string(), v.union(v.string(), v.number(), v.boolean(), v.null())),
+      ),
+      environment: v.string(),
+      createdAt: v.number(),
+    })
+      .index("by_created", ["createdAt"])
+      .index("by_name_and_created", ["name", "createdAt"])
+      .index("by_user_and_created", ["userId", "createdAt"])
+      .index("by_route_and_created", ["route", "createdAt"]),
 
     costSnapshots: defineTable({
       periodStart: v.number(),

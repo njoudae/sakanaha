@@ -7,14 +7,16 @@ import {
   Heart,
   Home,
   MapPinned,
+  Maximize2,
   MessageCircle,
   Pencil,
   Share2,
   Video,
+  X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Badge from "../components/Badge";
+import PropertyLocationMap from "../components/PropertyLocationMap";
 import RoommateRequestForm from "../components/RoommateRequestForm";
 import {
   addInterest,
@@ -22,16 +24,19 @@ import {
   getOwnerSubmittedPublishedProperties,
   getProperties,
   getPropertyById,
+  getPublicPropertyById,
   isFavoriteProperty,
   recordPropertyView,
   toggleFavoriteProperty,
 } from "../services/propertyService";
-import type { Property, User } from "@saknaha/shared-types";
+import type { Property, UniversityLocation, User } from "@saknaha/shared-types";
 import { absoluteAppUrl, cityPath, propertyPath } from "../utils/routes";
 import {
   formatRooms,
   formatServiceDistance,
   getGoogleMapsUrl,
+  getRentalPrices,
+  rentalPeriodLabels,
 } from "@saknaha/utils/propertyFormat";
 
 interface PropertyDetailsPageProps {
@@ -43,6 +48,8 @@ interface PropertyDetailsPageProps {
   onEdit?: (property: Property) => void;
   onPreviewBack?: () => void;
   onOwnerProperties?: () => void;
+  selectedUniversity: UniversityLocation | null;
+  onUniversityChange: (university: UniversityLocation | null) => void;
 }
 
 function maskPhone(phone: string) {
@@ -68,12 +75,15 @@ export default function PropertyDetailsPage({
   onEdit,
   onPreviewBack,
   onOwnerProperties,
+  selectedUniversity,
+  onUniversityChange,
 }: PropertyDetailsPageProps) {
-  const property = getPropertyById(propertyId);
   const isOwnerPreview = mode === "owner-preview";
+  const property = isOwnerPreview ? getPropertyById(propertyId) : getPublicPropertyById(propertyId);
   const userId = user?.id ?? "guest-user";
   const [message, setMessage] = useState("");
   const [imageIndex, setImageIndex] = useState(0);
+  const [fullScreenOpen, setFullScreenOpen] = useState(false);
   const [showRoommateForm, setShowRoommateForm] = useState(false);
   const [favorite, setFavorite] = useState(() =>
     property ? isFavoriteProperty(property.id, userId) : false,
@@ -82,6 +92,20 @@ export default function PropertyDetailsPage({
   useEffect(() => {
     if (property && !isOwnerPreview) recordPropertyView(property.id, userId);
   }, [isOwnerPreview, property, userId]);
+
+  useEffect(() => {
+    if (!fullScreenOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setFullScreenOpen(false);
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [fullScreenOpen]);
 
   const sameCityProperties = useMemo(() => {
     if (!property) return [];
@@ -92,7 +116,7 @@ export default function PropertyDetailsPage({
         : getProperties().filter((item) => item.ownerId !== "mock-owner");
     const sameCity = source.filter((item) => item.city === property.city);
     return sameCity.some((item) => item.id === property.id) ? sameCity : [property, ...sameCity];
-  }, [property?.id]);
+  }, [property]);
 
   if (!property) {
     return (
@@ -108,9 +132,12 @@ export default function PropertyDetailsPage({
   }
 
   const currentProperty = property;
-  const images = currentProperty.images.length > 0 ? currentProperty.images : [""];
+  const images = Array.from(
+    new Set(currentProperty.images.map((image) => image.trim()).filter(Boolean)),
+  );
   const activeImage = images[imageIndex] ?? images[0];
-  const googleMapsUrl = getGoogleMapsUrl(currentProperty);
+  const rentalPrices = getRentalPrices(currentProperty);
+  const googleMapsUrl = getGoogleMapsUrl(currentProperty, { canViewExact: isOwnerPreview });
   const canUseWhatsapp =
     currentProperty.allowWhatsappContact && whatsappUrl(currentProperty.ownerPhone);
   const pageUrl = absoluteAppUrl(propertyPath(currentProperty.id));
@@ -276,15 +303,31 @@ export default function PropertyDetailsPage({
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-black text-ink">صور السكن</p>
               <p className="text-xs font-bold text-stone-500">
-                {imageIndex + 1} / {images.length}
+                {images.length > 0 ? imageIndex + 1 : 0} / {images.length}
               </p>
             </div>
             <div className="relative">
-              <img
-                src={activeImage}
-                alt={`صورة السكن ${imageIndex + 1}`}
-                className="h-[340px] w-full rounded-2xl object-cover lg:h-[540px]"
-              />
+              {activeImage ? (
+                <img
+                  src={activeImage}
+                  alt={`صورة السكن ${imageIndex + 1}`}
+                  className="h-[340px] w-full rounded-2xl object-cover lg:h-[540px]"
+                />
+              ) : (
+                <div className="flex h-[340px] items-center justify-center rounded-2xl bg-stone-100 text-sm font-bold text-stone-500 lg:h-[540px]">
+                  لا توجد صور متاحة
+                </div>
+              )}
+              {activeImage ? (
+                <button
+                  className="secondary-button absolute left-3 top-3 !min-h-11 !rounded-full !px-3"
+                  type="button"
+                  onClick={() => setFullScreenOpen(true)}
+                  aria-label="عرض الصورة بكامل الشاشة"
+                >
+                  <Maximize2 size={20} aria-hidden="true" />
+                </button>
+              ) : null}
               {images.length > 1 ? (
                 <>
                   <button
@@ -359,8 +402,13 @@ export default function PropertyDetailsPage({
               <Info label="الحي" value={property.neighborhood} />
               <Info label="العنوان" value={property.address} />
               <Info label="أقرب جامعة/عمل" value={property.universityNearby} />
-              <Info label="السعر" value={`${property.price.toLocaleString("ar-SA")} ريال`} />
-              <Info label="العقد" value={property.paymentType} />
+              {rentalPrices.map(({ period, price }) => (
+                <Info
+                  key={period}
+                  label={`الإيجار ${rentalPeriodLabels[period]}`}
+                  value={`${price.toLocaleString("ar-SA")} ريال`}
+                />
+              ))}
               <Info
                 label="عقد إيجار إلزامي"
                 value={(property.requiresLeaseContract ?? true) ? "نعم" : "لا"}
@@ -379,8 +427,6 @@ export default function PropertyDetailsPage({
                 label="باص الجامعة"
                 value={property.universityBusPasses ? "يمر عليه" : "لا يمر عليه"}
               />
-              <Info label="الزمن" value={property.timeText} />
-              <Info label="القرب" value={property.distanceText} />
             </dl>
 
             <div className="mt-4 rounded-2xl bg-linen p-4">
@@ -404,7 +450,12 @@ export default function PropertyDetailsPage({
                 فتح الموقع
               </button>
             ) : (
-              <a className="secondary-button" href={googleMapsUrl} target="_blank" rel="noreferrer">
+              <a
+                className="secondary-button"
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <MapPinned size={18} aria-hidden="true" />
                 فتح الموقع
               </a>
@@ -463,6 +514,83 @@ export default function PropertyDetailsPage({
           </div>
         ) : null}
       </section>
+      {fullScreenOpen && activeImage ? (
+        <div
+          className="fixed inset-0 z-[4000] flex flex-col bg-stone-950/95 p-3 md:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="معرض صور السكن بكامل الشاشة"
+        >
+          <div className="mb-3 flex items-center justify-between text-white">
+            <p className="text-sm font-black">
+              {imageIndex + 1} / {images.length}
+            </p>
+            <button
+              className="secondary-button !border-white/30 !bg-white/10 !text-white"
+              type="button"
+              onClick={() => setFullScreenOpen(false)}
+              aria-label="إغلاق العرض بكامل الشاشة"
+            >
+              <X size={20} aria-hidden="true" />
+              إغلاق
+            </button>
+          </div>
+          <div className="relative flex min-h-0 flex-1 items-center justify-center">
+            <img
+              src={activeImage}
+              alt={`صورة السكن ${imageIndex + 1}`}
+              className="max-h-full max-w-full rounded-2xl object-contain"
+            />
+            {images.length > 1 ? (
+              <>
+                <button
+                  className="secondary-button absolute left-2 top-1/2 !min-h-12 !rounded-full !border-white/30 !bg-white/10 !px-4 !text-white -translate-y-1/2"
+                  type="button"
+                  onClick={nextImage}
+                  aria-label="الصورة التالية"
+                >
+                  <ChevronLeft size={24} aria-hidden="true" />
+                </button>
+                <button
+                  className="secondary-button absolute right-2 top-1/2 !min-h-12 !rounded-full !border-white/30 !bg-white/10 !px-4 !text-white -translate-y-1/2"
+                  type="button"
+                  onClick={previousImage}
+                  aria-label="الصورة السابقة"
+                >
+                  <ChevronRight size={24} aria-hidden="true" />
+                </button>
+              </>
+            ) : null}
+          </div>
+          {images.length > 1 ? (
+            <div className="mx-auto mt-4 flex max-w-full gap-2 overflow-x-auto pb-1">
+              {images.map((image, index) => (
+                <button
+                  key={`${image}-fullscreen-${index}`}
+                  className={`shrink-0 rounded-xl border-2 p-1 ${
+                    index === imageIndex ? "border-white" : "border-transparent"
+                  }`}
+                  type="button"
+                  onClick={() => setImageIndex(index)}
+                  aria-label={`عرض صورة ${index + 1}`}
+                >
+                  <img
+                    src={image}
+                    alt=""
+                    className="h-16 w-20 rounded-lg object-cover md:h-20 md:w-28"
+                  />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      <PropertyLocationMap
+        property={currentProperty}
+        selectedUniversity={selectedUniversity}
+        onUniversityChange={onUniversityChange}
+        allowExactLocation={isOwnerPreview}
+      />
     </main>
   );
 }
@@ -505,7 +633,7 @@ function PhoneInfo({
               className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-mintdeep transition hover:bg-emerald-200"
               href={url}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               aria-label="فتح محادثة واتساب"
             >
               <MessageCircle size={18} aria-hidden="true" />

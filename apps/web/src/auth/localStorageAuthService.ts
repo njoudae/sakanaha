@@ -1,4 +1,5 @@
 import type { AuthService } from "./AuthService";
+import { mockUniversities } from "@saknaha/constants/mockUniversities";
 import {
   getCurrentOwner,
   getCurrentUser,
@@ -19,6 +20,8 @@ export const localStorageAuthService: AuthService = {
     apple: false,
     sessionRefresh: false,
   },
+  universityBranches: mockUniversities,
+  selectedUniversityBranch: null,
   getCurrentOwner,
   getCurrentUser,
   loginOwnerWithPhone: async (phone) => loginOwner(phone),
@@ -41,4 +44,5 @@ export const localStorageAuthService: AuthService = {
   },
   verifyPhoneOtp: async () => false,
   refreshSession: async () => false,
+  saveSelectedUniversityBranch: async () => undefined,
 };

@@ -11,7 +11,9 @@ This document defines the production target architecture for Saknaha. It is the 
 - The web app currently stores owners, users, properties, favorites, interests, roommate requests, and negotiations in browser `localStorage`.
 - Authentication is currently client-side phone lookup, not a production trust boundary.
 - Maps and media are partially mocked or browser-local.
-- There are no first-party lint, typecheck, test, CI, backend, monitoring, analytics, backup, or disaster recovery systems yet.
+- The platform has first-party lint, typecheck, tests, a Convex backend, secure media and notification
+  pipelines, Sentry-ready monitoring, PostHog-ready privacy-safe analytics, backup/restore tooling,
+  security hardening, performance budgets, and protected CI/CD workflows.
 
 ## Target Architecture
 

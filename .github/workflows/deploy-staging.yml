@@ -1,0 +1,116 @@
+name: Deploy Staging
+
+on:
+  workflow_run:
+    workflows: [Quality Gates]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    name: Deploy and verify staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    env:
+      CI: "true"
+      HUSKY: "0"
+      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      APP_HEALTH_URL: ${{ vars.APP_HEALTH_URL }}
+      VITE_APP_ENV: staging
+      VITE_APP_RELEASE: staging-${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Check out the exact validated revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --include=dev
+
+      - name: Validate CI deployment secrets
+        run: node scripts/ci/validate-environment.mjs --environment staging --source ci
+
+      - name: Pull isolated staging Vercel configuration
+        run: npx --yes vercel@56.3.1 pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Validate staging frontend environment
+        run: >-
+          node scripts/ci/validate-environment.mjs --environment staging --source frontend
+          --file .vercel/.env.production.local
+
+      - name: Validate staging Convex secret names
+        run: |
+          npx convex env list --names-only > "$RUNNER_TEMP/convex-env-names.txt"
+          node scripts/ci/validate-environment.mjs --environment staging --source convex --keys-only \
+            --file "$RUNNER_TEMP/convex-env-names.txt" \
+            --feature-file .vercel/.env.production.local
+
+      - name: Validate deployment configuration
+        run: npm run validate:deployment
+
+      - name: Build against and deploy the staging Convex backend
+        run: >-
+          npx convex deploy --typecheck=disable --cmd-url-env-var-name VITE_CONVEX_URL
+          --message "staging:${{ github.event.workflow_run.head_sha }}"
+          --cmd "npx --yes vercel@56.3.1 build --prod --token=$VERCEL_TOKEN"
+
+      - name: Deploy immutable staging web artifact
+        id: deploy
+        shell: bash
+        run: |
+          deployment_url="$(npx --yes vercel@56.3.1 deploy --prebuilt --prod --token="$VERCEL_TOKEN" | tail -n 1)"
+          test -n "$deployment_url"
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+      - name: Verify deployed Convex function metadata
+        run: npx convex function-spec > "$RUNNER_TEMP/convex-function-spec.json"
+
+      - name: Verify immutable deployment health
+        env:
+          IMMUTABLE_DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        run: node scripts/ci/verify-health.mjs --url "$IMMUTABLE_DEPLOYMENT_URL"
+
+      - name: Verify staging alias health
+        run: node scripts/ci/verify-health.mjs --url "$APP_HEALTH_URL"
+
+      - name: Retain Vercel build output
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: staging-vercel-output-${{ github.event.workflow_run.head_sha }}
+          path: .vercel/output
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish deployment summary
+        env:
+          IMMUTABLE_DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        shell: bash
+        run: |
+          {
+            echo "## Staging deployment"
+            echo "- Commit: \`${{ github.event.workflow_run.head_sha }}\`"
+            echo "- Immutable URL: $IMMUTABLE_DEPLOYMENT_URL"
+            echo "- Alias health: $APP_HEALTH_URL"
+            echo "- Status: verified"
+          } >> "$GITHUB_STEP_SUMMARY"

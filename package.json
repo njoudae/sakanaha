@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "packageManager": "npm@11.9.0",
+  "overrides": {
+    "vite": {
+      "esbuild": "^0.28.1"
+    }
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -13,14 +18,26 @@
   },
   "scripts": {
     "dev": "turbo run dev --filter=@saknaha/web",
-    "build": "turbo run build",
-    "build:all": "turbo run build",
+    "build": "turbo run build && npm run performance:budget",
+    "build:all": "npm run build",
     "preview": "turbo run preview --filter=@saknaha/web",
-    "lint": "eslint convex && turbo run lint",
-    "lint:fix": "eslint convex --fix && turbo run lint:fix",
+    "lint": "eslint convex scripts && turbo run lint",
+    "lint:fix": "eslint convex scripts --fix && turbo run lint:fix",
     "typecheck": "tsc -b",
-    "test": "turbo run test",
+    "test": "turbo run test && npm run test:convex && npm run test:backup && npm run test:ci",
+    "test:convex": "vitest run convex --config vitest.config.ts --configLoader runner --environment edge-runtime",
+    "test:security": "vitest run convex/security.integration.test.ts packages/providers/src/providerSecurity.test.ts packages/providers/src/emailProvider.contract.test.ts --config vitest.config.ts --configLoader runner --environment edge-runtime",
+    "test:backup": "vitest run scripts/backup --config vitest.config.ts --configLoader runner --environment node",
+    "test:ci": "vitest run scripts/ci --config vitest.config.ts --configLoader runner --environment node",
     "test:watch": "turbo run test:watch",
+    "backup:create": "node scripts/backup/create.mjs",
+    "backup:validate": "node scripts/backup/validate.mjs",
+    "backup:restore": "node scripts/backup/restore.mjs",
+    "backup:verify-restore": "node scripts/backup/verify-restore.mjs",
+    "performance:budget": "node scripts/performance/check-build.mjs",
+    "security:scan": "node scripts/ci/scan-secrets.mjs",
+    "validate:environment": "node scripts/ci/validate-environment.mjs --environment staging --source template --file .env.staging.example && node scripts/ci/validate-environment.mjs --environment production --source template --file .env.production.example",
+    "validate:deployment": "node scripts/ci/validate-deployment.mjs",
     "convex:codegen": "convex codegen --typecheck disable",
     "convex:dev": "convex dev",
     "format": "prettier . --write",
@@ -39,16 +56,21 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
+    "@edge-runtime/vm": "^5.0.0",
     "@eslint/js": "^10.0.1",
+    "convex-test": "^0.0.54",
     "eslint": "^10.6.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "fflate": "^0.8.2",
     "globals": "^17.7.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
     "prettier": "^3.9.4",
     "turbo": "^2.6.0",
     "typescript-eslint": "^8.63.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "yauzl": "^3.4.0",
+    "yaml": "2.9.0"
   }
 }

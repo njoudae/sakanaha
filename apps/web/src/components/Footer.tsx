@@ -1,4 +1,4 @@
-import logo from "../assets/saknaha-logo.png";
+import logo from "../assets/saknaha-logo.webp";
 import type { ReactNode } from "react";
 
 interface FooterProps {
@@ -22,7 +22,15 @@ export default function Footer({
     <footer className="border-t border-stone-200/70 bg-white/75">
       <div className="mx-auto grid w-full max-w-7xl gap-7 px-4 py-8 md:grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr] md:px-8">
         <div>
-          <img src={logo} alt="سكنها" className="h-14 w-32 object-contain object-right" />
+          <img
+            src={logo}
+            alt="سكنها"
+            width="320"
+            height="264"
+            loading="lazy"
+            decoding="async"
+            className="h-14 w-32 object-contain object-right"
+          />
           <p className="mt-3 max-w-md text-sm font-bold leading-7 text-stone-600">
             سكنها منصة تساعد الباحثات عن السكن وأصحاب الوحدات على الوصول لبعضهم بطريقة أوضح وأسهل.
           </p>

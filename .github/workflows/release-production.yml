@@ -1,0 +1,151 @@
+name: Release Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semver tag matching package.json, for example v1.0.0
+        required: true
+        type: string
+      commit_sha:
+        description: Full 40-character SHA already validated on main and staging
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Validate, deploy, verify, and tag production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    env:
+      CI: "true"
+      HUSKY: "0"
+      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      APP_HEALTH_URL: ${{ vars.APP_HEALTH_URL }}
+      VITE_APP_ENV: production
+      VITE_APP_RELEASE: ${{ inputs.version }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_SHA: ${{ inputs.commit_sha }}
+    steps:
+      - name: Check out the exact approved revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify release identity and main ancestry
+        shell: bash
+        run: |
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          node scripts/ci/validate-release.mjs --version "$RELEASE_VERSION" --sha "$RELEASE_SHA"
+
+      - name: Install locked dependencies
+        run: npm ci --include=dev
+
+      - name: Validate repository deployment configuration
+        run: npm run validate:environment && npm run validate:deployment && npm run security:scan
+
+      - name: Run production release gates
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run test:security
+          npm audit --audit-level=low
+          npm run build
+          npm run validate:deployment -- --artifact
+          git diff --check
+
+      - name: Validate production CI secrets
+        run: node scripts/ci/validate-environment.mjs --environment production --source ci
+
+      - name: Pull isolated production Vercel configuration
+        run: npx --yes vercel@56.3.1 pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Validate production frontend environment
+        run: >-
+          node scripts/ci/validate-environment.mjs --environment production --source frontend
+          --file .vercel/.env.production.local
+
+      - name: Validate production Convex secret names
+        run: |
+          npx convex env list --names-only > "$RUNNER_TEMP/convex-env-names.txt"
+          node scripts/ci/validate-environment.mjs --environment production --source convex --keys-only \
+            --file "$RUNNER_TEMP/convex-env-names.txt" \
+            --feature-file .vercel/.env.production.local
+
+      - name: Build against and deploy the production Convex backend
+        run: |
+          npx convex deploy --typecheck=disable --cmd-url-env-var-name VITE_CONVEX_URL \
+            --message "release:$RELEASE_VERSION:$RELEASE_SHA" \
+            --cmd "npx --yes vercel@56.3.1 build --prod --token=$VERCEL_TOKEN"
+
+      - name: Deploy immutable production web artifact
+        id: deploy
+        shell: bash
+        run: |
+          deployment_url="$(npx --yes vercel@56.3.1 deploy --prebuilt --prod --token="$VERCEL_TOKEN" | tail -n 1)"
+          test -n "$deployment_url"
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+      - name: Verify deployed Convex function metadata
+        run: npx convex function-spec > "$RUNNER_TEMP/convex-function-spec.json"
+
+      - name: Verify immutable deployment health
+        env:
+          IMMUTABLE_DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        run: node scripts/ci/verify-health.mjs --url "$IMMUTABLE_DEPLOYMENT_URL"
+
+      - name: Verify production alias health
+        run: node scripts/ci/verify-health.mjs --url "$APP_HEALTH_URL"
+
+      - name: Retain production Vercel output
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: production-vercel-output-${{ env.RELEASE_VERSION }}
+          path: .vercel/output
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create immutable release tag and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$RELEASE_VERSION" -m "Saknaha $RELEASE_VERSION"
+          git push origin "$RELEASE_VERSION"
+          gh release create "$RELEASE_VERSION" --verify-tag --generate-notes \
+            --title "Saknaha $RELEASE_VERSION"
+
+      - name: Publish release summary
+        env:
+          IMMUTABLE_DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        shell: bash
+        run: |
+          {
+            echo "## Production release $RELEASE_VERSION"
+            echo "- Commit: \`$RELEASE_SHA\`"
+            echo "- Immutable URL: $IMMUTABLE_DEPLOYMENT_URL"
+            echo "- Production health: $APP_HEALTH_URL"
+            echo "- Tag and GitHub release: created after health verification"
+          } >> "$GITHUB_STEP_SUMMARY"

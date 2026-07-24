@@ -6,6 +6,9 @@ const USER_KEY = "saknaha.users";
 const CURRENT_OWNER_KEY = "saknaha.currentOwner";
 const CURRENT_USER_KEY = "saknaha.currentUser";
 const TEST_PHONE = "0582968140";
+export const DEVELOPMENT_ADMIN_PHONE = "0582968141";
+const DEVELOPMENT_ADMIN_ENABLED =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEVELOPMENT_ADMIN === "true";
 
 function normalizePhone(phone: string): string {
   return phone.trim().replace(/\s+/g, "");
@@ -54,6 +57,30 @@ function ensureTestUser(): User {
   return user;
 }
 
+function ensureDevelopmentAdmin(): User {
+  const users = readStorage<User[]>(USER_KEY, []);
+  const existing = users.find((item) => normalizePhone(item.phone) === DEVELOPMENT_ADMIN_PHONE);
+  const admin: User = {
+    ...(existing ?? {
+      id: makeId("admin"),
+      phone: DEVELOPMENT_ADMIN_PHONE,
+      createdAt: new Date().toISOString(),
+    }),
+    name: "مدير سكنها - حساب التطوير",
+    role: "employee",
+    platformRole: "admin",
+    city: "الرياض",
+    monthlyBudget: 0,
+    acceptsRoommate: false,
+  };
+  const nextUsers = users.some((item) => item.id === admin.id)
+    ? users.map((item) => (item.id === admin.id ? admin : item))
+    : [admin, ...users];
+  writeStorage(USER_KEY, nextUsers);
+  writeStorage(CURRENT_USER_KEY, admin);
+  return admin;
+}
+
 export function registerOwner(input: Omit<Owner, "id" | "createdAt">): Owner {
   const owner: Owner = { ...input, id: makeId("owner"), createdAt: new Date().toISOString() };
   const owners = readStorage<Owner[]>(OWNER_KEY, []);
@@ -67,6 +94,10 @@ export function registerOwner(input: Omit<Owner, "id" | "createdAt">): Owner {
 
 export function getCurrentOwner(): Owner | null {
   return readStorage<Owner | null>(CURRENT_OWNER_KEY, null);
+}
+
+export function getAllOwners(): Owner[] {
+  return readStorage<Owner[]>(OWNER_KEY, []);
 }
 
 export function loginOwner(phone: string): Owner | null {
@@ -103,6 +134,10 @@ export function getCurrentUser(): User | null {
   return readStorage<User | null>(CURRENT_USER_KEY, null);
 }
 
+export function getAllUsers(): User[] {
+  return readStorage<User[]>(USER_KEY, []);
+}
+
 export function updateUserProfile(userId: string, input: Pick<User, "name" | "city">): User | null {
   const users = readStorage<User[]>(USER_KEY, []);
   const currentUser = getCurrentUser();
@@ -122,8 +157,32 @@ export function updateUserProfile(userId: string, input: Pick<User, "name" | "ci
   return updated;
 }
 
+export function updateUserUniversityPreference(
+  userId: string,
+  selectedUniversityBranchId: string | null,
+): User | null {
+  const users = readStorage<User[]>(USER_KEY, []);
+  const currentUser = getCurrentUser();
+  const existing = users.find((item) => item.id === userId) ?? currentUser;
+  if (!existing || existing.id !== userId) return null;
+
+  const updated: User = {
+    ...existing,
+    selectedUniversityBranchId: selectedUniversityBranchId ?? undefined,
+  };
+  const nextUsers = users.some((item) => item.id === userId)
+    ? users.map((item) => (item.id === userId ? updated : item))
+    : [updated, ...users];
+  writeStorage(USER_KEY, nextUsers);
+  writeStorage(CURRENT_USER_KEY, updated);
+  return updated;
+}
+
 export function loginUser(phone: string): User | null {
   const normalizedPhone = normalizePhone(phone);
+  if (normalizedPhone === DEVELOPMENT_ADMIN_PHONE && DEVELOPMENT_ADMIN_ENABLED) {
+    return ensureDevelopmentAdmin();
+  }
   if (normalizedPhone === TEST_PHONE) return ensureTestUser();
   const user = readStorage<User[]>(USER_KEY, []).find(
     (item) => normalizePhone(item.phone) === normalizedPhone,

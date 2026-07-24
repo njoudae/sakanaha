@@ -1,32 +1,38 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
-import AuthModal from "./components/AuthModal";
 import AppBar from "./components/AppBar";
 import DashboardShell from "./components/DashboardShell";
 import Footer from "./components/Footer";
-import AddPropertyPage from "./pages/AddPropertyPage";
-import AboutPage from "./pages/AboutPage";
-import AdminDashboardPage from "./pages/AdminDashboardPage";
-import CityResultsPage from "./pages/CityResultsPage";
-import FaqPage from "./pages/FaqPage";
-import HousingPage from "./pages/HousingPage";
 import LandingPage from "./pages/LandingPage";
-import ManagePropertyPage from "./pages/ManagePropertyPage";
-import OwnerDashboardPage from "./pages/OwnerDashboardPage";
-import OwnerLoginPage from "./pages/OwnerLoginPage";
-import OwnerRegisterPage from "./pages/OwnerRegisterPage";
-import PropertyDetailsPage from "./pages/PropertyDetailsPage";
-import RoommateDetailsPage from "./pages/RoommateDetailsPage";
-import RoommatesPage from "./pages/RoommatesPage";
-import RoommateCreatePage from "./pages/RoommateCreatePage";
-import SupportPage from "./pages/SupportPage";
-import UserDashboardPage from "./pages/UserDashboardPage";
-import UserLocationPage from "./pages/UserLocationPage";
-import UserLoginPage from "./pages/UserLoginPage";
-import UserRegisterPage from "./pages/UserRegisterPage";
-import UserSearchPage from "./pages/UserSearchPage";
 import { useAuthService } from "./auth";
+import {
+  getSelectedUniversityBranch,
+  saveLocalUniversityPreference,
+} from "./services/universityPreferenceService";
 import type { Owner, Property, UniversityLocation, User } from "@saknaha/shared-types";
+import { useAdminData } from "./data/AdminDataContext";
+
+const AuthModal = lazy(() => import("./components/AuthModal"));
+const AddPropertyPage = lazy(() => import("./pages/AddPropertyPage"));
+const AboutPage = lazy(() => import("./pages/AboutPage"));
+const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
+const CityResultsPage = lazy(() => import("./pages/CityResultsPage"));
+const FaqPage = lazy(() => import("./pages/FaqPage"));
+const HousingPage = lazy(() => import("./pages/HousingPage"));
+const ManagePropertyPage = lazy(() => import("./pages/ManagePropertyPage"));
+const OwnerDashboardPage = lazy(() => import("./pages/OwnerDashboardPage"));
+const OwnerLoginPage = lazy(() => import("./pages/OwnerLoginPage"));
+const OwnerRegisterPage = lazy(() => import("./pages/OwnerRegisterPage"));
+const PropertyDetailsPage = lazy(() => import("./pages/PropertyDetailsPage"));
+const RoommateDetailsPage = lazy(() => import("./pages/RoommateDetailsPage"));
+const RoommatesPage = lazy(() => import("./pages/RoommatesPage"));
+const RoommateCreatePage = lazy(() => import("./pages/RoommateCreatePage"));
+const SupportPage = lazy(() => import("./pages/SupportPage"));
+const UserDashboardPage = lazy(() => import("./pages/UserDashboardPage"));
+const UserLocationPage = lazy(() => import("./pages/UserLocationPage"));
+const UserLoginPage = lazy(() => import("./pages/UserLoginPage"));
+const UserRegisterPage = lazy(() => import("./pages/UserRegisterPage"));
+const UserSearchPage = lazy(() => import("./pages/UserSearchPage"));
 
 type Route =
   | "landing"
@@ -102,6 +108,7 @@ interface UserAuthOptions {
 
 export default function App() {
   const authService = useAuthService();
+  const adminData = useAdminData();
   const initialPublicRoute = useMemo(() => parsePublicPath(), []);
   const [route, setRoute] = useState<Route>(initialPublicRoute.route);
   const [cityName, setCityName] = useState(initialPublicRoute.cityName ?? "");
@@ -110,7 +117,9 @@ export default function App() {
   const [owner, setOwner] = useState<Owner | null>(() => authService.getCurrentOwner());
   const [user, setUser] = useState<User | null>(() => authService.getCurrentUser());
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
-  const [selectedUniversity, setSelectedUniversity] = useState<UniversityLocation | null>(null);
+  const [selectedUniversity, setSelectedUniversity] = useState<UniversityLocation | null>(() =>
+    getSelectedUniversityBranch(authService.getCurrentUser()),
+  );
   const [pendingUserRoute, setPendingUserRoute] = useState<RouteState | null>(null);
   const [returnToUserDashboard, setReturnToUserDashboard] = useState(false);
   const [authTransitionMessage, setAuthTransitionMessage] = useState("");
@@ -136,8 +145,17 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  const effectiveSelectedUniversity = selectedUniversity ?? authService.selectedUniversityBranch;
+
   function refresh() {
     forceRefresh((value) => value + 1);
+  }
+
+  function handleUniversityChange(university: UniversityLocation | null) {
+    setSelectedUniversity(university);
+    const updatedUser = saveLocalUniversityPreference(user, university?.id ?? null);
+    if (updatedUser) setUser(updatedUser);
+    void authService.saveSelectedUniversityBranch(university?.id ?? null).catch(() => undefined);
   }
 
   function showAuthTransition(message: string) {
@@ -168,7 +186,11 @@ export default function App() {
 
   function goUserStart() {
     if (user) {
-      setRoute("user-dashboard");
+      if (user.platformRole === "admin") {
+        navigatePublic({ route: "admin-dashboard" });
+      } else {
+        setRoute("user-dashboard");
+      }
       return;
     }
     openAuthModal("user");
@@ -181,7 +203,11 @@ export default function App() {
       return;
     }
     if (user) {
-      setRoute("user-dashboard");
+      if (user.platformRole === "admin") {
+        navigatePublic({ route: "admin-dashboard" });
+      } else {
+        setRoute("user-dashboard");
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -234,7 +260,7 @@ export default function App() {
   }
 
   function goFilteredHousing(nextCity: string, university: UniversityLocation | null = null) {
-    setSelectedUniversity(university);
+    if (university) handleUniversityChange(university);
     setCityName(nextCity || "");
     setPropertyId("");
     setRequestId("");
@@ -304,12 +330,23 @@ export default function App() {
     showAuthTransition("جاري تسجيل الدخول...");
     setUser(nextUser);
     setOwner(null);
+    if (effectiveSelectedUniversity) {
+      const updatedUser = saveLocalUniversityPreference(nextUser, effectiveSelectedUniversity.id);
+      if (updatedUser) setUser(updatedUser);
+      void authService
+        .saveSelectedUniversityBranch(effectiveSelectedUniversity.id)
+        .catch(() => undefined);
+    }
     const currentProtectedRoute =
       route === "roommate-detail" && requestId
         ? ({ route: "roommate-detail", requestId } as const)
         : null;
     const next = pendingUserRoute ?? currentProtectedRoute;
     setPendingUserRoute(null);
+    if (nextUser.platformRole === "admin") {
+      navigatePublic({ route: "admin-dashboard" });
+      return;
+    }
     if (next) {
       if (next.route === "user-location") {
         setRoute("user-location");
@@ -377,7 +414,7 @@ export default function App() {
           onFaq={goFaq}
           onSupport={goSupport}
         />
-        {children}
+        <Suspense fallback={<RouteLoadingFallback />}>{children}</Suspense>
         {showFooter ? (
           <Footer
             onHome={() => navigatePublic({ route: "landing" })}
@@ -388,17 +425,21 @@ export default function App() {
             onSupport={goSupport}
           />
         ) : null}
-        <AuthModal
-          key={`${effectiveAuthModalOpen}-${effectiveAuthModalIntent ?? "choose"}-${propertyId}-${requestId}`}
-          open={effectiveAuthModalOpen}
-          initialIntent={effectiveAuthModalIntent}
-          onClose={() => {
-            setAuthModalOpen(false);
-            if (protectedGuestRoute) navigatePublic({ route: "roommates" });
-          }}
-          onOwnerAuthenticated={completeOwnerAuth}
-          onUserAuthenticated={completeUserAuth}
-        />
+        {effectiveAuthModalOpen ? (
+          <Suspense fallback={<AuthTransitionOverlay message="جاري التحميل..." />}>
+            <AuthModal
+              key={`${effectiveAuthModalOpen}-${effectiveAuthModalIntent ?? "choose"}-${propertyId}-${requestId}`}
+              open={effectiveAuthModalOpen}
+              initialIntent={effectiveAuthModalIntent}
+              onClose={() => {
+                setAuthModalOpen(false);
+                if (protectedGuestRoute) navigatePublic({ route: "roommates" });
+              }}
+              onOwnerAuthenticated={completeOwnerAuth}
+              onUserAuthenticated={completeUserAuth}
+            />
+          </Suspense>
+        ) : null}
         {authTransitionMessage ? <AuthTransitionOverlay message={authTransitionMessage} /> : null}
       </>
     );
@@ -467,6 +508,7 @@ export default function App() {
   if (route === "owner-property-preview" && owner) {
     return frame(
       <PropertyDetailsPage
+        key={propertyId}
         propertyId={propertyId}
         user={null}
         mode="owner-preview"
@@ -475,6 +517,8 @@ export default function App() {
         onEdit={editProperty}
         onPreviewBack={() => setRoute("owner-dashboard")}
         onOwnerProperties={() => setRoute("owner-dashboard")}
+        selectedUniversity={effectiveSelectedUniversity}
+        onUniversityChange={handleUniversityChange}
       />,
     );
   }
@@ -512,6 +556,8 @@ export default function App() {
         onRoommateDetails={goRoommateDetailsFromUserDashboard}
         onUserUpdated={setUser}
         onLogout={handleAccountLogout}
+        selectedUniversity={effectiveSelectedUniversity}
+        onUniversityChange={handleUniversityChange}
       />,
       true,
     );
@@ -524,6 +570,8 @@ export default function App() {
         onFindHousing={goFilteredHousing}
         onFindRoommateMatch={goFilteredRoommates}
         onCreateRoommateCard={goRoommateCreate}
+        selectedUniversity={effectiveSelectedUniversity}
+        onUniversityChange={handleUniversityChange}
       />,
     );
   }
@@ -544,7 +592,7 @@ export default function App() {
     return frame(
       <UserSearchPage
         user={user}
-        selectedUniversity={selectedUniversity}
+        selectedUniversity={effectiveSelectedUniversity}
         onBack={() => setRoute("user-location")}
         onHome={() => navigatePublic({ route: "landing" })}
         onProperty={goProperty}
@@ -561,6 +609,8 @@ export default function App() {
         onProperty={goProperty}
         onRoommateDetails={goRoommateDetails}
         onRoommates={goRoommates}
+        selectedUniversity={effectiveSelectedUniversity}
+        onUniversityChange={handleUniversityChange}
       />,
       true,
     );
@@ -582,10 +632,13 @@ export default function App() {
   if (route === "property") {
     return frame(
       <PropertyDetailsPage
+        key={propertyId}
         propertyId={propertyId}
         user={user}
         onBackToCity={goBackFromPropertyDetails}
         onProperty={goProperty}
+        selectedUniversity={effectiveSelectedUniversity}
+        onUniversityChange={handleUniversityChange}
       />,
       true,
     );
@@ -621,14 +674,28 @@ export default function App() {
 
   if (route === "roommate-detail") {
     return frame(
-      <RoommateDetailsPage requestId={requestId} user={user} onBack={goBackFromRoommateDetails} />,
+      <RoommateDetailsPage
+        requestId={requestId}
+        user={user}
+        onBack={goBackFromRoommateDetails}
+        selectedUniversity={effectiveSelectedUniversity}
+        onUniversityChange={handleUniversityChange}
+      />,
       true,
     );
   }
 
   if (route === "admin-dashboard") {
     const platformRole = (user as (User & { platformRole?: string }) | null)?.platformRole;
-    return frame(platformRole === "admin" ? <AdminDashboardPage /> : <AdminAccessDenied />, true);
+    if (adminData.accessLoading) return frame(<RouteLoadingFallback />, true);
+    return frame(
+      platformRole === "admin" || adminData.authorized ? (
+        <AdminDashboardPage />
+      ) : (
+        <AdminAccessDenied />
+      ),
+      true,
+    );
   }
 
   if (route === "faq") {
@@ -665,6 +732,16 @@ function AdminAccessDenied() {
           لوحة الإدارة غير موجودة في التنقل العادي، ولا تفتح إلا بحساب يملك صلاحية المدير في المنصة.
         </p>
       </section>
+    </main>
+  );
+}
+
+function RouteLoadingFallback() {
+  return (
+    <main className="page-shell" aria-busy="true" aria-label="جاري تحميل الصفحة">
+      <div className="flex min-h-[40vh] items-center justify-center" role="status">
+        <Loader2 className="h-9 w-9 animate-spin text-berry" aria-hidden="true" />
+      </div>
     </main>
   );
 }

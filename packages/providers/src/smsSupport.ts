@@ -4,6 +4,7 @@ import type {
   SmsProviderName,
   SmsSendRequest,
 } from "./messaging";
+import { assertSecureProviderEndpoint } from "./providerSecurity";
 
 export interface SmsFetchResponseLike {
   ok: boolean;
@@ -90,7 +91,7 @@ export async function postJson(
   body: unknown,
   headers: HeadersInit,
 ) {
-  const response = await runtime.fetch(url, {
+  const response = await runtime.fetch(assertSecureProviderEndpoint(url, `${provider} endpoint`), {
     method: "POST",
     headers: {
       "content-type": "application/json",

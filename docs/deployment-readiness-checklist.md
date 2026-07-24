@@ -10,6 +10,9 @@ Use this checklist before deploying Saknaha to staging or production.
 - [ ] `vercel.json` points to `apps/web/dist`.
 - [ ] Convex functions are present under `convex`.
 - [ ] Documentation is updated for the current feature flags and providers.
+- [ ] M17 changes were merged through a reviewed pull request.
+- [ ] Vercel Git auto-deployments are disabled; GitHub Actions is the only deployment authority.
+- [ ] `main` requires the Quality Gates status check.
 
 ## Quality Gates
 
@@ -17,7 +20,13 @@ Use this checklist before deploying Saknaha to staging or production.
 - [ ] `npm run lint` passes.
 - [ ] `npm run typecheck` passes.
 - [ ] `npm run test` passes.
+- [ ] `npm run test:security` passes.
+- [ ] `npm audit --audit-level=low` reports zero vulnerabilities.
+- [ ] `npm run security:scan` passes.
+- [ ] `npm run validate:environment` passes.
+- [ ] `npm run validate:deployment -- --artifact` passes after the build.
 - [ ] `npm run build` passes.
+- [ ] `git diff --check` passes.
 - [ ] Known warnings are documented before deployment.
 
 ## Accounts And Access
@@ -38,6 +47,11 @@ Use this checklist before deploying Saknaha to staging or production.
 - [ ] Staging and production use separate provider quotas and billing alerts.
 - [ ] Vercel frontend variables contain only `VITE_` public values.
 - [ ] Convex server variables contain all private provider secrets.
+- [ ] Dedicated Vercel projects exist for staging and production.
+- [ ] Dedicated Convex projects/deployments exist for staging and production.
+- [ ] GitHub `staging` and `production` environments contain separate deployment secrets.
+- [ ] Production requires an independent reviewer and prevents self-approval.
+- [ ] `APP_HEALTH_URL` is the correct HTTPS alias in each GitHub environment.
 
 ## Security
 
@@ -81,7 +95,10 @@ Use this checklist before deploying Saknaha to staging or production.
 - [ ] Favorites work.
 - [ ] Roommate matching works.
 - [ ] Owner dashboard works.
-- [ ] Admin dashboard skipped or tested, depending on implementation status.
+- [ ] Admin, owner, and user dashboards load with their approved behavior.
+- [ ] Media upload, thumbnail, cover, removal, and orphan-cleanup behavior is verified.
+- [ ] Notification read state, preferences, email/SMS delivery, retry, and deep links are verified.
+- [ ] Sentry release/error capture and PostHog privacy-safe events are verified when enabled.
 
 ## Rollback
 
@@ -90,3 +107,26 @@ Use this checklist before deploying Saknaha to staging or production.
 - [ ] SMS kill switch is tested.
 - [ ] Maps paid-call kill switch is tested.
 - [ ] Auth flags can disable incomplete login methods without redeploying frontend code.
+- [ ] Last healthy release tag, Vercel deployment ID, and Convex audit entry are recorded.
+- [ ] Operator can execute `vercel rollback` and redeploy the prior Convex release tag.
+- [ ] Deployment failure recovery contacts and escalation paths are current.
+
+## Release
+
+- [ ] `package.json` version matches the intended semver tag.
+- [ ] Production workflow input uses the full staging-verified 40-character SHA.
+- [ ] Staging deployment and manual smoke evidence are attached to the release decision.
+- [ ] Production immutable URL and canonical alias pass automated health verification.
+- [ ] Tag and GitHub release are created only after health checks pass.
+- [ ] Production `.vercel/output` artifact is retained for 30 days.
+- [ ] Post-release observation owner and duration are recorded.
+
+## Backup And Recovery
+
+- [ ] Production periodic Convex backups are enabled and include file storage.
+- [ ] The latest external ZIP and manifest pass `npm run backup:validate`.
+- [ ] Backup artifacts are encrypted, access-controlled, immutable/versioned, and outside the repository.
+- [ ] A quarterly isolated restore drill has passed within the documented RPO/RTO.
+- [ ] The current release has a validated pre-release recovery point.
+- [ ] Code revision and secret-manager configuration can be recovered independently of Convex data.
+- [ ] Two authorized operators know the production restore approval and confirmation workflow.

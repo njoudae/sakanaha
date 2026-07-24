@@ -10,31 +10,33 @@ import {
   UserRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { mockUniversities } from "@saknaha/constants/mockUniversities";
+import { useEffect, useState } from "react";
+import PropertyLocationMap from "../components/PropertyLocationMap";
 import {
   addRoommateJoinRequest,
   getPropertyById,
   getRoommateRequestById,
   recordRoommateRequestView,
 } from "../services/propertyService";
-import type { Property, UniversityLocation, User } from "@saknaha/shared-types";
+import type { UniversityLocation, User } from "@saknaha/shared-types";
 
 interface RoommateDetailsPageProps {
   requestId: string;
   user: User | null;
   onBack: () => void;
+  selectedUniversity: UniversityLocation | null;
+  onUniversityChange: (university: UniversityLocation | null) => void;
 }
 
-export default function RoommateDetailsPage({ requestId, user, onBack }: RoommateDetailsPageProps) {
+export default function RoommateDetailsPage({
+  requestId,
+  user,
+  onBack,
+  selectedUniversity,
+  onUniversityChange,
+}: RoommateDetailsPageProps) {
   const request = getRoommateRequestById(requestId);
   const property = request ? getPropertyById(request.propertyId) : null;
-  const universities = useMemo(
-    () =>
-      property ? mockUniversities.filter((item) => item.city === property.city) : mockUniversities,
-    [property?.city],
-  );
-  const [selectedUniversityId, setSelectedUniversityId] = useState(universities[0]?.id ?? "");
   const [activeImage, setActiveImage] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
 
@@ -59,11 +61,6 @@ export default function RoommateDetailsPage({ requestId, user, onBack }: Roommat
     );
   }
 
-  const selectedUniversity =
-    universities.find((item) => item.id === selectedUniversityId) ?? universities[0];
-  const distanceText = selectedUniversity
-    ? formatDistance(property, selectedUniversity)
-    : "غير محدد";
   const images = property.images.length > 0 ? property.images : [""];
   const pricePerPerson = Math.ceil(property.price / Math.max(1, property.maxResidents));
 
@@ -85,12 +82,11 @@ export default function RoommateDetailsPage({ requestId, user, onBack }: Roommat
       </header>
 
       <section className="grid gap-5 lg:grid-cols-2">
-        <DistanceMap
+        <PropertyLocationMap
           property={property}
-          universities={universities}
           selectedUniversity={selectedUniversity}
-          onSelect={setSelectedUniversityId}
-          distanceText={distanceText}
+          onUniversityChange={onUniversityChange}
+          className="mt-0"
         />
 
         <div className="rounded-3xl border border-white/80 bg-white/90 p-4 shadow-soft">
@@ -200,84 +196,6 @@ export default function RoommateDetailsPage({ requestId, user, onBack }: Roommat
   );
 }
 
-function DistanceMap({
-  property,
-  universities,
-  selectedUniversity,
-  onSelect,
-  distanceText,
-}: {
-  property: Property;
-  universities: UniversityLocation[];
-  selectedUniversity?: UniversityLocation;
-  onSelect: (id: string) => void;
-  distanceText: string;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/80 bg-white/90 p-4 shadow-soft">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <label className="flex-1">
-          <span className="label">اختاري الجامعة أو جهة المقارنة</span>
-          <select
-            className="field field-select"
-            value={selectedUniversity?.id ?? ""}
-            onChange={(event) => onSelect(event.target.value)}
-          >
-            {universities.map((university) => (
-              <option key={university.id} value={university.id}>
-                {university.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-mintdeep">
-          يبعد السكن تقريبًا {distanceText}
-        </div>
-      </div>
-
-      <div className="relative mt-4 min-h-[330px] overflow-hidden rounded-2xl border border-sky-100 bg-[#d9eceb]">
-        <div className="absolute inset-0 opacity-70 [background-image:linear-gradient(90deg,rgba(255,255,255,.65)_1px,transparent_1px),linear-gradient(rgba(255,255,255,.65)_1px,transparent_1px)] [background-size:44px_44px]" />
-        <MapDot
-          className="right-[22%] top-[32%]"
-          color="#7f3b75"
-          label={selectedUniversity?.name ?? "الجامعة"}
-        />
-        <MapDot className="left-[24%] bottom-[28%]" color="#25856f" label={property.neighborhood} />
-        <div className="absolute left-[28%] right-[27%] top-[48%] h-1 rotate-[-18deg] rounded-full bg-berry/60" />
-        <div className="absolute right-4 top-4 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-stone-100">
-          <p className="text-xs font-black text-ink">خريطة تقريبية</p>
-          <div className="mt-2 space-y-2 text-xs font-bold text-stone-600">
-            <Legend color="#7f3b75" label="الجامعة" />
-            <Legend color="#25856f" label="السكن" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MapDot({ className, color, label }: { className: string; color: string; label: string }) {
-  return (
-    <div className={`absolute z-10 flex items-center gap-2 ${className}`}>
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-soft">
-        <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: color }} />
-      </span>
-      <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-ink shadow-sm">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-      <span>{label}</span>
-    </div>
-  );
-}
-
 function Info({
   icon: Icon,
   label,
@@ -298,21 +216,4 @@ function Info({
       <p className={`mt-1 font-black ${highlight ? "text-xl text-berry" : "text-ink"}`}>{value}</p>
     </div>
   );
-}
-
-function formatDistance(property: Property, university: UniversityLocation) {
-  if (!property.lat || !property.lng) return property.distanceText;
-  const distance = haversineKm(property.lat, property.lng, university.lat, university.lng);
-  return `${distance.toLocaleString("ar-SA", { maximumFractionDigits: 1 })} كم`;
-}
-
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const radius = 6371;
-  const toRad = (value: number) => (value * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }

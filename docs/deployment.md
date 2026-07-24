@@ -12,7 +12,7 @@ This guide prepares Saknaha for a real staging deployment without deploying auto
 
 Create or confirm access to:
 
-- GitHub repository access for Vercel import and future CI/CD.
+- GitHub repository administration access for Actions, environments, secrets, and branch protection.
 - Vercel team/project for the frontend.
 - Convex team/project for staging and production backend deployments.
 - Google Cloud project for Google OAuth and Google Maps Platform.
@@ -145,7 +145,7 @@ Required server-side Convex variables:
 - `AUTH_GOOGLE_ID`
 - `AUTH_GOOGLE_SECRET`
 - `AUTH_EMAIL_OTP_WEBHOOK_URL`
-- `AUTH_EMAIL_OTP_WEBHOOK_SECRET`, optional but recommended
+- `AUTH_EMAIL_OTP_WEBHOOK_SECRET`, required when Email OTP is enabled
 - `AUTH_PHONE_OTP_ENABLED`
 - `JWT_PRIVATE_KEY`
 - `JWKS`
@@ -186,11 +186,12 @@ Webhook requirements:
 
 - HTTPS only.
 - Accepts channel, destination, code, and expiry payload.
-- Authenticated with `AUTH_EMAIL_OTP_WEBHOOK_SECRET` when configured.
+- Authenticated with the required `AUTH_EMAIL_OTP_WEBHOOK_SECRET`.
 - Must not log plaintext OTP codes.
 - Must rate limit and monitor delivery failures.
 
-Production email-provider adapter work remains future scope.
+The webhook email-provider adapter is production-ready when its HTTPS endpoint, bearer secret,
+idempotency handling, monitoring, and provider account are configured.
 
 ## SMS Provider Setup
 
@@ -236,16 +237,17 @@ Provider flags:
 
 Frontend public variables, Vercel:
 
-| Variable                                | Required                            | Purpose                              |
-| --------------------------------------- | ----------------------------------- | ------------------------------------ |
-| `VITE_CONVEX_URL`                       | when Convex auth or data is enabled | Convex client URL.                   |
-| `VITE_FEATURE_AUTH_CONVEX_AUTH_ENABLED` | yes for auth staging                | Enables Convex Auth client path.     |
-| `VITE_FEATURE_AUTH_GOOGLE_ENABLED`      | yes for Google test                 | Enables Google login UI path.        |
-| `VITE_FEATURE_AUTH_EMAIL_OTP_ENABLED`   | yes for Email OTP test              | Enables Email OTP UI path.           |
-| `VITE_FEATURE_AUTH_PHONE_OTP_ENABLED`   | optional                            | Enables Phone OTP UI path.           |
-| `VITE_FEATURE_DATA_CONVEX_ENABLED`      | optional                            | Enables Convex data client creation. |
-| `VITE_FEATURE_DATA_DUAL_READ_ENABLED`   | optional                            | Future migration control.            |
-| `VITE_FEATURE_DATA_DUAL_WRITE_ENABLED`  | optional                            | Future migration control.            |
+| Variable                                          | Required                            | Purpose                                                                      |
+| ------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| `VITE_CONVEX_URL`                                 | when Convex auth or data is enabled | Convex client URL.                                                           |
+| `VITE_FEATURE_AUTH_CONVEX_AUTH_ENABLED`           | yes for auth staging                | Enables Convex Auth client path.                                             |
+| `VITE_FEATURE_AUTH_GOOGLE_ENABLED`                | yes for Google test                 | Enables Google login UI path.                                                |
+| `VITE_FEATURE_AUTH_EMAIL_OTP_ENABLED`             | yes for Email OTP test              | Enables Email OTP UI path.                                                   |
+| `VITE_FEATURE_AUTH_PHONE_OTP_ENABLED`             | optional                            | Enables Phone OTP UI path.                                                   |
+| `VITE_FEATURE_DATA_CONVEX_ENABLED`                | optional                            | Enables Convex data client creation.                                         |
+| `VITE_FEATURE_DATA_DUAL_READ_ENABLED`             | optional                            | Future migration control.                                                    |
+| `VITE_FEATURE_DATA_DUAL_WRITE_ENABLED`            | optional                            | Future migration control.                                                    |
+| `VITE_FEATURE_MAPS_UNIVERSITY_DIRECTIONS_ENABLED` | optional (defaults to true)         | Enables free university-to-housing directions links; no API key is required. |
 
 Convex server variables:
 
@@ -255,7 +257,7 @@ Convex server variables:
 | `AUTH_GOOGLE_ID`                                 | for Google login    | Google OAuth client ID.                             |
 | `AUTH_GOOGLE_SECRET`                             | for Google login    | Google OAuth secret.                                |
 | `AUTH_EMAIL_OTP_WEBHOOK_URL`                     | for Email OTP       | Secure email OTP delivery endpoint.                 |
-| `AUTH_EMAIL_OTP_WEBHOOK_SECRET`                  | recommended         | Bearer secret for Email OTP webhook.                |
+| `AUTH_EMAIL_OTP_WEBHOOK_SECRET`                  | for Email OTP       | Required bearer secret for Email OTP webhook.       |
 | `AUTH_PHONE_OTP_ENABLED`                         | for Phone OTP       | Server-side Phone OTP enablement.                   |
 | `JWT_PRIVATE_KEY`                                | for Convex Auth     | JWT signing private key.                            |
 | `JWKS`                                           | for Convex Auth     | JSON Web Key Set.                                   |
@@ -326,8 +328,16 @@ Local tooling variables:
 - OpenStreetMap: available without a secret, with `OPENSTREETMAP_USER_AGENT` recommended.
 - Email OTP: fails closed if `AUTH_EMAIL_OTP_WEBHOOK_URL` is missing while Email OTP is enabled.
 - SMS: disabled by default; emergency kill switch stops all SMS; missing provider credentials fail before sending; provider failures are retried/fail over only when classified temporary.
-- Convex Storage/media: schema boundaries exist, but upload pipeline is not implemented yet.
-- Sentry/PostHog: provider selectors exist, but integrations are not implemented yet.
+- Convex Storage/media: secure upload, validation, thumbnail, attachment, permission, retry, and
+  orphan-cleanup boundaries are implemented.
+- Sentry/PostHog: integrations are implemented behind their existing disabled-by-default flags and
+  require environment-specific projects and credentials.
+
+## CI/CD entry point
+
+Repository deployments are controlled by the workflows documented in `docs/ci-cd.md`. Vercel Git
+auto-deployment must be disabled to prevent duplicate or ungated releases. Use separate staging and
+production Vercel and Convex projects, and follow `docs/deployment-failure-recovery.md` for rollback.
 
 ## Deployment Validation Checklist
 

@@ -252,15 +252,10 @@ export function createFallbackMapsProvider(
       withFallback("autocomplete", (provider) => provider.autocomplete(query, context)),
     nearbySearch: (point, category, context) =>
       withFallback("nearbySearch", (provider) => provider.nearbySearch(point, category, context)),
-    calculateRoute: async (origin, destination, context) => {
-      try {
-        return await withFallback("calculateRoute", (provider) =>
-          provider.calculateRoute(origin, destination, context),
-        );
-      } catch {
-        return fallbackRoute(origin, destination);
-      }
-    },
+    calculateRoute: (origin, destination, context) =>
+      withFallback("calculateRoute", (provider) =>
+        provider.calculateRoute(origin, destination, context),
+      ),
     calculateTravelTime: async (origin, destination, context) => {
       const route = await withFallback("calculateTravelTime", (provider) =>
         provider.calculateRoute(origin, destination, context),

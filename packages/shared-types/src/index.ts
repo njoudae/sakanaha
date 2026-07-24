@@ -1,9 +1,21 @@
 export type UserRole = "student" | "employee";
-export type PropertyStatus = "published" | "draft" | "paused";
+export type PropertyStatus =
+  | "published"
+  | "draft"
+  | "pending_review"
+  | "approved"
+  | "rejected"
+  | "archived"
+  | "unpublished"
+  | "paused";
+export type PublicationStatus =
+  "draft" | "pending_review" | "approved" | "rejected" | "archived" | "unpublished";
 export type PropertyType = "شقة" | "دور" | "غرفة" | "عمارة" | "سكن مشترك";
 export type PropertyClassification =
   "نسائي بالكامل" | "عوائل" | "دور نسائي داخل سكن عوائل" | "متاح للجميع";
 export type PaymentType = "شهري" | "سنوي" | "سنة دراسية";
+export type RentalPeriod = "daily" | "weekly" | "monthly" | "yearly";
+export type RentalPrices = Partial<Record<RentalPeriod, number>>;
 export type ServiceType = "بقالة" | "مطعم" | "مغسلة" | "صيدلية" | "مواصلات" | "جامعة" | "غير ذلك";
 export type DistanceUnit = "meter" | "kilometer" | "walking_minutes" | "driving_minutes" | "hour";
 
@@ -24,9 +36,11 @@ export interface User {
   email?: string;
   phone: string;
   role: UserRole;
+  platformRole?: "admin" | "support" | "moderator" | "owner" | "user" | "service_provider";
   city: string;
   monthlyBudget: number;
   acceptsRoommate: boolean;
+  selectedUniversityBranchId?: string;
   createdAt: string;
 }
 
@@ -45,13 +59,17 @@ export interface Property {
   ownerPhone: string;
   title: string;
   propertyLicenseNumber: string;
+  region?: string;
   city: string;
   neighborhood: string;
+  district?: string;
+  landmark?: string;
   address: string;
   universityNearby: string;
   googleMapsUrl: string;
   lat?: number;
   lng?: number;
+  locationVisibility?: "exact" | "approximate" | "private";
   classification: PropertyClassification;
   propertyType: PropertyType;
   minRooms: number;
@@ -68,6 +86,7 @@ export interface Property {
   requiresLeaseContract?: boolean;
   price: number;
   paymentType: PaymentType;
+  rentalPrices?: RentalPrices;
   negotiable: boolean;
   allowWhatsappContact: boolean;
   deposit?: number;
@@ -76,9 +95,22 @@ export interface Property {
   images: string[];
   videos?: string[];
   status: PropertyStatus;
+  publicationStatus?: PublicationStatus;
+  rejectionReason?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  paymentCompleted?: boolean;
   distanceText: string;
   timeText: string;
   createdAt: string;
+}
+
+export interface University {
+  id: string;
+  name: string;
+  region?: string;
+  city: string;
+  active: boolean;
 }
 
 export interface Interest {
@@ -118,6 +150,17 @@ export interface RoommateRequest {
   moveInDate: string;
   bio: string;
   availableRooms: number;
+  region?: string;
+  city?: string;
+  district?: string;
+  landmark?: string;
+  universityBranchId?: string;
+  approximateLat?: number;
+  approximateLng?: number;
+  publicationStatus?: PublicationStatus;
+  rejectionReason?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
   createdAt: string;
 }
 
@@ -158,9 +201,13 @@ export interface NegotiationSignal {
 
 export interface UniversityLocation {
   id: string;
+  universityId: string;
+  universityName?: string;
+  region?: string;
   city: string;
   name: string;
   label: string;
   lat: number;
   lng: number;
+  active: boolean;
 }

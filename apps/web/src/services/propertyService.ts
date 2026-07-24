@@ -14,6 +14,7 @@ import type {
   ServiceNearby,
 } from "@saknaha/shared-types";
 import { makeId, readStorage, writeStorage } from "./storage";
+import { normalizeRentalPrices } from "@saknaha/utils/propertyFormat";
 
 const PROPERTY_KEY = "saknaha.properties";
 const INTEREST_KEY = "saknaha.interests";
@@ -43,6 +44,15 @@ function normalizeProperty(property: Property & { rooms?: number }): Property {
   const roomCount = property.rooms ?? property.minRooms ?? 1;
   return {
     ...property,
+    region: property.region ?? "",
+    district: property.district ?? property.neighborhood,
+    publicationStatus:
+      property.publicationStatus ??
+      (property.status === "published"
+        ? "approved"
+        : property.status === "paused"
+          ? "unpublished"
+          : "draft"),
     propertyLicenseNumber: property.propertyLicenseNumber || "غير محدد",
     googleMapsUrl: property.googleMapsUrl || "",
     minRooms: property.minRooms ?? roomCount,
@@ -54,6 +64,7 @@ function normalizeProperty(property: Property & { rooms?: number }): Property {
     universityBusPasses: property.universityBusPasses ?? false,
     requiresLeaseContract: property.requiresLeaseContract ?? property.roommateAllowed ?? true,
     allowWhatsappContact: property.allowWhatsappContact ?? property.negotiable ?? false,
+    rentalPrices: normalizeRentalPrices(property),
     videos: property.videos ?? [],
     services: property.services.map(normalizeService),
   };
@@ -82,7 +93,10 @@ function normalizeService(service: ServiceNearby & { distance?: string }): Servi
 }
 
 export function getPublishedProperties(): Property[] {
-  return getProperties().filter((property) => property.status === "published");
+  return getProperties().filter(
+    (property) =>
+      property.status === "published" && (property.publicationStatus ?? "approved") === "approved",
+  );
 }
 
 export function getOwnerSubmittedPublishedProperties(): Property[] {
@@ -91,6 +105,10 @@ export function getOwnerSubmittedPublishedProperties(): Property[] {
 
 export function getPropertyById(id: string): Property | null {
   return getProperties().find((property) => property.id === id) ?? null;
+}
+
+export function getPublicPropertyById(id: string): Property | null {
+  return getPublishedProperties().find((property) => property.id === id) ?? null;
 }
 
 export function getOwnerProperties(ownerId: string): Property[] {
@@ -123,9 +141,55 @@ export function saveProperty(property: Property): Property {
 
 export function updatePropertyStatus(id: string, status: PropertyStatus): void {
   const next = getProperties().map((property) =>
-    property.id === id ? { ...property, status } : property,
+    property.id === id
+      ? {
+          ...property,
+          status,
+          publicationStatus:
+            status === "published"
+              ? "approved"
+              : status === "paused" || status === "unpublished"
+                ? "unpublished"
+                : property.publicationStatus,
+        }
+      : property,
   );
   writeStorage(PROPERTY_KEY, next);
+}
+
+export function moderateLocalProperty(
+  id: string,
+  publicationStatus: NonNullable<Property["publicationStatus"]>,
+  rejectionReason?: string,
+): void {
+  const reviewedAt = new Date().toISOString();
+  const next = getProperties().map((property) => {
+    if (property.id !== id) return property;
+    return {
+      ...property,
+      publicationStatus,
+      rejectionReason: publicationStatus === "rejected" ? rejectionReason?.trim() : undefined,
+      reviewedAt,
+      status:
+        publicationStatus === "approved"
+          ? "published"
+          : publicationStatus === "archived"
+            ? "archived"
+            : publicationStatus === "unpublished"
+              ? "unpublished"
+              : publicationStatus === "rejected"
+                ? "rejected"
+                : "draft",
+    };
+  });
+  writeStorage(PROPERTY_KEY, next);
+}
+
+export function deleteLocalProperty(id: string): void {
+  writeStorage(
+    PROPERTY_KEY,
+    getProperties().filter((property) => property.id !== id),
+  );
 }
 
 export function addInterest(input: Omit<Interest, "id" | "createdAt">): Interest {
@@ -246,11 +310,28 @@ function demoRoommateRequests(): RoommateRequest[] {
     ...request,
     id: `demo-roommate-${index + 1}`,
     userId: `demo-user-${index + 1}`,
+    region: "منطقة عسير",
+    city: "أبها",
+    district:
+      request.propertyId === "mock-badee"
+        ? "حي البديع"
+        : request.propertyId === "mock-nuzhah"
+          ? "حي النزهة"
+          : "طريق الملك",
+    universityBranchId: index === 0 ? "kku-quraiger" : index === 2 ? "kku-king-road" : undefined,
+    publicationStatus: "approved" as const,
+    submittedAt: new Date().toISOString(),
     createdAt: new Date().toISOString(),
   }));
 }
 
 export function getRoommateRequests(): RoommateRequest[] {
+  return getAllRoommateRequests().filter(
+    (request) => (request.publicationStatus ?? "approved") === "approved",
+  );
+}
+
+export function getAllRoommateRequests(): RoommateRequest[] {
   const saved = readStorage<RoommateRequest[]>(ROOMMATE_REQUEST_KEY, []);
   const savedIds = new Set(saved.map((request) => request.id));
   const demos = demoRoommateRequests().filter((request) => !savedIds.has(request.id));
@@ -271,8 +352,36 @@ export function addRoommateRequest(
     id: makeId("roommate-request"),
     createdAt: new Date().toISOString(),
   };
-  writeStorage(ROOMMATE_REQUEST_KEY, [request, ...getRoommateRequests()]);
+  writeStorage(ROOMMATE_REQUEST_KEY, [request, ...getAllRoommateRequests()]);
   return request;
+}
+
+export function moderateLocalRoommateRequest(
+  id: string,
+  publicationStatus: NonNullable<RoommateRequest["publicationStatus"]>,
+  rejectionReason?: string,
+): void {
+  const reviewedAt = new Date().toISOString();
+  writeStorage(
+    ROOMMATE_REQUEST_KEY,
+    getAllRoommateRequests().map((request) =>
+      request.id === id
+        ? {
+            ...request,
+            publicationStatus,
+            rejectionReason: publicationStatus === "rejected" ? rejectionReason?.trim() : undefined,
+            reviewedAt,
+          }
+        : request,
+    ),
+  );
+}
+
+export function deleteLocalRoommateRequest(id: string): void {
+  writeStorage(
+    ROOMMATE_REQUEST_KEY,
+    getAllRoommateRequests().filter((request) => request.id !== id),
+  );
 }
 
 export function updateRoommateCard(
@@ -297,6 +406,18 @@ export function updateRoommateCard(
     availableRooms,
     organization: input.organization.trim(),
     bio: input.bio.trim(),
+    publicationStatus:
+      existingRequest.publicationStatus === "rejected"
+        ? "pending_review"
+        : existingRequest.publicationStatus,
+    submittedAt:
+      existingRequest.publicationStatus === "rejected"
+        ? new Date().toISOString()
+        : existingRequest.submittedAt,
+    rejectionReason:
+      existingRequest.publicationStatus === "rejected"
+        ? undefined
+        : existingRequest.rejectionReason,
   };
 
   writeStorage(
@@ -317,6 +438,13 @@ export function updateRoommateCard(
       maxRooms: availableRooms,
       maxResidents: availableRooms,
       price: Math.max(1, input.pricePerPerson) * availableRooms,
+      publicationStatus:
+        property.publicationStatus === "rejected" ? "pending_review" : property.publicationStatus,
+      status: property.publicationStatus === "rejected" ? "pending_review" : property.status,
+      submittedAt:
+        property.publicationStatus === "rejected" ? new Date().toISOString() : property.submittedAt,
+      rejectionReason:
+        property.publicationStatus === "rejected" ? undefined : property.rejectionReason,
     };
     writeStorage(
       PROPERTY_KEY,
@@ -438,7 +566,7 @@ export function updateRoommateJoinRequestStatus(
 export function getUserActivity(userId: string) {
   const properties = getProperties();
   const propertiesById = new Map(properties.map((property) => [property.id, property]));
-  const roommateRequests = getRoommateRequests();
+  const roommateRequests = getAllRoommateRequests();
   const roommateRequestsById = new Map(roommateRequests.map((request) => [request.id, request]));
   const roommateViews = readStorage<RoommateRequestView[]>(ROOMMATE_VIEW_KEY, []);
   const propertyViews = readStorage<PropertyView[]>(PROPERTY_VIEW_KEY, []);

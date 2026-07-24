@@ -17,7 +17,8 @@
     ".": "./src/index.ts",
     "./cities": "./src/cities.ts",
     "./mockProperties": "./src/mockProperties.ts",
-    "./mockUniversities": "./src/mockUniversities.ts"
+    "./mockUniversities": "./src/mockUniversities.ts",
+    "./locations": "./src/locations.ts"
   },
   "dependencies": {
     "@saknaha/shared-types": "0.1.0"

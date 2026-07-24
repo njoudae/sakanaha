@@ -2,6 +2,7 @@ import { ArrowLeft, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import PropertyCard from "../components/PropertyCard";
 import RoommateListingCard from "../components/RoommateListingCard";
+import UniversityReferenceSelector from "../components/UniversityReferenceSelector";
 import { cityNames } from "@saknaha/constants/cities";
 import {
   getPublishedProperties,
@@ -10,7 +11,7 @@ import {
   isFavoriteProperty,
   toggleFavoriteProperty,
 } from "../services/propertyService";
-import type { Property, RoommateRequest, User } from "@saknaha/shared-types";
+import type { Property, RoommateRequest, UniversityLocation, User } from "@saknaha/shared-types";
 import { absoluteAppUrl, propertyPath } from "../utils/routes";
 
 interface HousingPageProps {
@@ -19,6 +20,8 @@ interface HousingPageProps {
   onProperty: (propertyId: string) => void;
   onRoommateDetails: (requestId: string) => void;
   onRoommates: () => void;
+  selectedUniversity: UniversityLocation | null;
+  onUniversityChange: (university: UniversityLocation | null) => void;
 }
 
 interface RoommateListing {
@@ -32,6 +35,8 @@ export default function HousingPage({
   onProperty,
   onRoommateDetails,
   onRoommates,
+  selectedUniversity,
+  onUniversityChange,
 }: HousingPageProps) {
   const [city, setCity] = useState(initialCity);
   const [visibleCount, setVisibleCount] = useState(12);
@@ -101,6 +106,14 @@ export default function HousingPage({
               ))}
             </select>
           </label>
+          <div className="mt-3 border-t border-stone-100 pt-3">
+            <UniversityReferenceSelector
+              selectedUniversity={selectedUniversity}
+              onChange={onUniversityChange}
+              city={city}
+              compact
+            />
+          </div>
         </div>
       </header>
 

@@ -41,6 +41,17 @@ export {
 export { createMsegatSmsProvider } from "./msegatSmsProvider";
 export { createTaqnySmsProvider } from "./taqnySmsProvider";
 export { createTwilioSmsProvider } from "./twilioSmsProvider";
+export { createWebhookEmailProvider } from "./webhookEmailProvider";
+export { assertSecureProviderEndpoint } from "./providerSecurity";
+export {
+  EmailProviderError,
+  emailPayload,
+  renderEmailTemplate,
+  type EmailFetchLike,
+  type EmailFetchResponseLike,
+  type EmailProviderRuntime,
+  type WebhookEmailCredentials,
+} from "./emailSupport";
 export {
   SmsProviderError,
   exponentialBackoffDelayMs,
@@ -92,6 +103,11 @@ export type {
   StoredObjectMetadata,
   UploadRequest,
   UploadTarget,
+} from "./storage";
+export {
+  DEFAULT_IMAGE_MIME_TYPES,
+  hasExpectedImageSignature,
+  validateImageUpload,
 } from "./storage";
 export type { ProviderConfiguration, ProviderEnvironment } from "./providerConfig";
 export { createProviderConfiguration } from "./providerConfig";

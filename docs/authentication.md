@@ -41,7 +41,7 @@ Future providers should be added as Convex Auth providers and exposed through `A
 - `AUTH_GOOGLE_ID`
 - `AUTH_GOOGLE_SECRET`
 - `AUTH_EMAIL_OTP_WEBHOOK_URL`
-- `AUTH_EMAIL_OTP_WEBHOOK_SECRET` optional
+- `AUTH_EMAIL_OTP_WEBHOOK_SECRET` required when Email OTP is enabled
 - `AUTH_PHONE_OTP_ENABLED` optional, default disabled
 - `SAKNAHA_SMS_ENABLED` required for actual SMS delivery
 - `SAKNAHA_SMS_PROVIDER` optional, default selected provider `msegat`

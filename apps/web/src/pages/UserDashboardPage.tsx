@@ -15,6 +15,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { cityNames } from "@saknaha/constants/cities";
+import UniversityReferenceSelector from "../components/UniversityReferenceSelector";
 import {
   getUserActivity,
   deleteRoommateCard,
@@ -24,7 +25,7 @@ import {
   updateRoommateCard,
 } from "../services/propertyService";
 import { updateUserProfile } from "../services/userService";
-import type { User } from "@saknaha/shared-types";
+import type { PublicationStatus, UniversityLocation, User } from "@saknaha/shared-types";
 
 interface UserDashboardPageProps {
   user: User;
@@ -35,6 +36,8 @@ interface UserDashboardPageProps {
   onRoommateDetails: (requestId: string) => void;
   onUserUpdated: (user: User) => void;
   onLogout: () => void;
+  selectedUniversity: UniversityLocation | null;
+  onUniversityChange: (university: UniversityLocation | null) => void;
 }
 
 export default function UserDashboardPage({
@@ -46,6 +49,8 @@ export default function UserDashboardPage({
   onRoommateDetails,
   onUserUpdated,
   onLogout,
+  selectedUniversity,
+  onUniversityChange,
 }: UserDashboardPageProps) {
   const [, setActivityVersion] = useState(0);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -212,6 +217,15 @@ export default function UserDashboardPage({
             </button>
           </div>
         ) : null}
+        {editingProfile ? (
+          <div className="mt-3 rounded-2xl bg-linen p-4">
+            <UniversityReferenceSelector
+              selectedUniversity={selectedUniversity}
+              onChange={onUniversityChange}
+              city={profileCity}
+            />
+          </div>
+        ) : null}
         {profileMessage ? (
           <p className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-mintdeep">
             {profileMessage}
@@ -266,7 +280,11 @@ export default function UserDashboardPage({
                     <div>
                       <button
                         className="text-right text-lg font-black text-ink hover:text-berry"
-                        onClick={() => onRoommateDetails(card.request.id)}
+                        onClick={() => {
+                          if ((card.request.publicationStatus ?? "approved") === "approved") {
+                            onRoommateDetails(card.request.id);
+                          }
+                        }}
                         type="button"
                       >
                         {card.property
@@ -276,6 +294,14 @@ export default function UserDashboardPage({
                       <p className="mt-1 text-sm font-bold text-stone-600">
                         {card.request.availableRooms.toLocaleString("ar-SA")} غرف متاحة
                       </p>
+                      <p className="mt-1 text-sm font-black text-berry">
+                        الحالة: {roommatePublicationLabel(card.request.publicationStatus)}
+                      </p>
+                      {card.request.rejectionReason ? (
+                        <p className="mt-2 rounded-xl bg-rose-50 p-3 text-sm font-black text-rose-800">
+                          سبب الرفض أو التعديلات المطلوبة: {card.request.rejectionReason}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex gap-2">
                       <SmallMetric label="مشاهدات" value={card.views} />
@@ -542,6 +568,15 @@ function statusLabel(status: "pending" | "accepted" | "rejected") {
   if (status === "accepted") return "مقبول";
   if (status === "rejected") return "مرفوض";
   return "بانتظار الرد";
+}
+
+function roommatePublicationLabel(status: PublicationStatus | undefined) {
+  if (status === "pending_review") return "بانتظار مراجعة الإدارة";
+  if (status === "approved" || status === undefined) return "معتمدة";
+  if (status === "rejected") return "مرفوضة — يمكنك تعديلها وإعادة إرسالها";
+  if (status === "archived") return "مؤرشفة";
+  if (status === "unpublished") return "غير منشورة";
+  return "مسودة";
 }
 
 function DashboardAction({
