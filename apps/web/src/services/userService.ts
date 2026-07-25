@@ -5,6 +5,7 @@ const OWNER_KEY = "saknaha.owners";
 const USER_KEY = "saknaha.users";
 const CURRENT_OWNER_KEY = "saknaha.currentOwner";
 const CURRENT_USER_KEY = "saknaha.currentUser";
+export const PRIMARY_ACCOUNT_PHONE = "0582968140";
 export const DEVELOPMENT_ADMIN_PHONE = "0582968141";
 const DEVELOPMENT_ADMIN_ENABLED =
   import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEVELOPMENT_ADMIN === "true";
@@ -35,6 +36,41 @@ function removeLegacyTestAccounts() {
       localStorage.removeItem(CURRENT_USER_KEY);
     }
   }
+}
+
+function ensurePrimaryOwner(): Owner {
+  const owners = readStorage<Owner[]>(OWNER_KEY, []);
+  const existing = owners.find((owner) => normalizePhone(owner.phone) === PRIMARY_ACCOUNT_PHONE);
+  if (existing) return existing;
+
+  const owner: Owner = {
+    id: makeId("owner"),
+    fullName: "نجود",
+    phone: PRIMARY_ACCOUNT_PHONE,
+    ministryPropertyNumber: "",
+    createdAt: new Date().toISOString(),
+  };
+  writeStorage(OWNER_KEY, [owner, ...owners]);
+  return owner;
+}
+
+function ensurePrimaryUser(): User {
+  const users = readStorage<User[]>(USER_KEY, []);
+  const existing = users.find((user) => normalizePhone(user.phone) === PRIMARY_ACCOUNT_PHONE);
+  if (existing) return existing;
+
+  const user: User = {
+    id: makeId("user"),
+    name: "نجود",
+    phone: PRIMARY_ACCOUNT_PHONE,
+    role: "student",
+    city: "أبها",
+    monthlyBudget: 0,
+    acceptsRoommate: true,
+    createdAt: new Date().toISOString(),
+  };
+  writeStorage(USER_KEY, [user, ...users]);
+  return user;
 }
 
 function ensureDevelopmentAdmin(): User {
@@ -85,9 +121,12 @@ export function getAllOwners(): Owner[] {
 export function loginOwner(phone: string): Owner | null {
   removeLegacyTestAccounts();
   const normalizedPhone = normalizePhone(phone);
-  const owner = readStorage<Owner[]>(OWNER_KEY, []).find(
-    (item) => normalizePhone(item.phone) === normalizedPhone,
-  );
+  const owner =
+    normalizedPhone === PRIMARY_ACCOUNT_PHONE
+      ? ensurePrimaryOwner()
+      : readStorage<Owner[]>(OWNER_KEY, []).find(
+          (item) => normalizePhone(item.phone) === normalizedPhone,
+        );
   if (!owner) return null;
   writeStorage(CURRENT_OWNER_KEY, owner);
   return owner;
@@ -168,9 +207,12 @@ export function loginUser(phone: string): User | null {
   if (normalizedPhone === DEVELOPMENT_ADMIN_PHONE && DEVELOPMENT_ADMIN_ENABLED) {
     return ensureDevelopmentAdmin();
   }
-  const user = readStorage<User[]>(USER_KEY, []).find(
-    (item) => normalizePhone(item.phone) === normalizedPhone,
-  );
+  const user =
+    normalizedPhone === PRIMARY_ACCOUNT_PHONE
+      ? ensurePrimaryUser()
+      : readStorage<User[]>(USER_KEY, []).find(
+          (item) => normalizePhone(item.phone) === normalizedPhone,
+        );
   if (!user) return null;
   writeStorage(CURRENT_USER_KEY, user);
   return user;
