@@ -13,6 +13,17 @@ export const getFinalizeContext = internalQuery({
   },
 });
 
+export const getVideoFinalizeContext = internalQuery({
+  args: { mediaId: v.id("propertyMedia") },
+  handler: async (ctx, args) => {
+    const { media } = await requireMediaManager(ctx, args.mediaId);
+    if (media.kind !== "video" || media.status !== "processing" || !media.storageId) {
+      throw new Error("The video upload is not ready for processing.");
+    }
+    return media;
+  },
+});
+
 export const approve = internalMutation({
   args: {
     mediaId: v.id("propertyMedia"),

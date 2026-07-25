@@ -18,6 +18,7 @@ export interface UploadRequest {
 }
 
 export const DEFAULT_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export const DEFAULT_VIDEO_MIME_TYPES = ["video/mp4", "video/webm", "video/quicktime"] as const;
 
 export function validateImageUpload(
   request: Pick<UploadRequest, "fileName" | "mimeType" | "byteSize">,
@@ -37,6 +38,24 @@ export function validateImageUpload(
   }
 }
 
+export function validateVideoUpload(
+  request: Pick<UploadRequest, "fileName" | "mimeType" | "byteSize">,
+  maxUploadBytes: number,
+): void {
+  if (!request.fileName.trim() || request.fileName.length > 255) {
+    throw new Error("The video file name is invalid.");
+  }
+  if (!(DEFAULT_VIDEO_MIME_TYPES as readonly string[]).includes(request.mimeType)) {
+    throw new Error("The selected video type is not supported.");
+  }
+  if (!Number.isSafeInteger(request.byteSize) || request.byteSize <= 0) {
+    throw new Error("The video file is empty or invalid.");
+  }
+  if (request.byteSize > maxUploadBytes) {
+    throw new Error("The selected video exceeds the maximum upload size.");
+  }
+}
+
 export function hasExpectedImageSignature(bytes: Uint8Array, mimeType: string): boolean {
   if (mimeType === "image/jpeg") {
     return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
@@ -50,6 +69,22 @@ export function hasExpectedImageSignature(bytes: Uint8Array, mimeType: string): 
       bytes.length >= 12 &&
       String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
       String.fromCharCode(...bytes.slice(8, 12)) === "WEBP"
+    );
+  }
+  return false;
+}
+
+export function hasExpectedVideoSignature(bytes: Uint8Array, mimeType: string): boolean {
+  if (mimeType === "video/mp4" || mimeType === "video/quicktime") {
+    return bytes.length >= 12 && String.fromCharCode(...bytes.slice(4, 8)) === "ftyp";
+  }
+  if (mimeType === "video/webm") {
+    return (
+      bytes.length >= 4 &&
+      bytes[0] === 0x1a &&
+      bytes[1] === 0x45 &&
+      bytes[2] === 0xdf &&
+      bytes[3] === 0xa3
     );
   }
   return false;

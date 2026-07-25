@@ -15,6 +15,12 @@ import type {
 } from "@saknaha/shared-types";
 import { makeId, readStorage, writeStorage } from "./storage";
 import { normalizeRentalPrices } from "@saknaha/utils/propertyFormat";
+import {
+  getAvailabilityStatus,
+  getAvailableUnits,
+  getTotalUnits,
+  withNormalizedInventory,
+} from "./propertyAvailability";
 
 const PROPERTY_KEY = "saknaha.properties";
 const INTEREST_KEY = "saknaha.interests";
@@ -42,7 +48,7 @@ export function getProperties(): Property[] {
 
 function normalizeProperty(property: Property & { rooms?: number }): Property {
   const roomCount = property.rooms ?? property.minRooms ?? 1;
-  return {
+  const normalized: Property = {
     ...property,
     region: property.region ?? "",
     district: property.district ?? property.neighborhood,
@@ -68,6 +74,11 @@ function normalizeProperty(property: Property & { rooms?: number }): Property {
     videos: property.videos ?? [],
     services: property.services.map(normalizeService),
   };
+  return property.ownerId === "mock-owner" &&
+    property.totalUnits === undefined &&
+    property.availableUnits === undefined
+    ? normalized
+    : withNormalizedInventory(normalized);
 }
 
 function normalizeService(service: ServiceNearby & { distance?: string }): ServiceNearby {
@@ -128,9 +139,10 @@ export function getUserInterests(userId: string): Interest[] {
 
 export function saveProperty(property: Property): Property {
   const properties = getProperties();
-  const nextProperty = property.id
-    ? property
-    : { ...property, id: makeId("property"), createdAt: new Date().toISOString() };
+  const normalizedProperty = withNormalizedInventory(property);
+  const nextProperty = normalizedProperty.id
+    ? normalizedProperty
+    : { ...normalizedProperty, id: makeId("property"), createdAt: new Date().toISOString() };
   const exists = properties.some((item) => item.id === nextProperty.id);
   const next = exists
     ? properties.map((item) => (item.id === nextProperty.id ? nextProperty : item))
@@ -202,12 +214,86 @@ export function addInterest(input: Omit<Interest, "id" | "createdAt">): Interest
   return interest;
 }
 
+export function reservePropertyUnit(
+  input: Omit<Interest, "id" | "createdAt" | "mode">,
+):
+  | { status: "reserved"; interest: Interest; availableUnits: number }
+  | { status: "already_reserved"; availableUnits: number }
+  | { status: "full"; availableUnits: 0 } {
+  const interests = readStorage<Interest[]>(INTEREST_KEY, []);
+  const property = getPropertyById(input.propertyId);
+  if (!property) return { status: "full", availableUnits: 0 };
+  const availableUnits = getAvailableUnits(property);
+  const existing = interests.find(
+    (interest) =>
+      interest.userId === input.userId &&
+      interest.propertyId === input.propertyId &&
+      interest.mode === "whole-unit",
+  );
+  if (existing) return { status: "already_reserved", availableUnits };
+  if (availableUnits === 0) return { status: "full", availableUnits: 0 };
+
+  const interest: Interest = {
+    ...input,
+    mode: "whole-unit",
+    id: makeId("interest"),
+    createdAt: new Date().toISOString(),
+  };
+  const remaining = availableUnits - 1;
+  const totalUnits = getTotalUnits(property);
+  writeStorage(INTEREST_KEY, [interest, ...interests]);
+  writeStorage(
+    PROPERTY_KEY,
+    getProperties().map((item) =>
+      item.id === property.id
+        ? {
+            ...item,
+            totalUnits,
+            availableUnits: remaining,
+            availabilityStatus: getAvailabilityStatus({
+              ...item,
+              totalUnits,
+              availableUnits: remaining,
+            }),
+          }
+        : item,
+    ),
+  );
+  return { status: "reserved", interest, availableUnits: remaining };
+}
+
 export function removeUserInterest(userId: string, propertyId: string): void {
+  const interests = readStorage<Interest[]>(INTEREST_KEY, []);
+  const removedReservation = interests.some(
+    (interest) =>
+      interest.userId === userId &&
+      interest.propertyId === propertyId &&
+      interest.mode === "whole-unit",
+  );
   writeStorage(
     INTEREST_KEY,
-    readStorage<Interest[]>(INTEREST_KEY, []).filter(
+    interests.filter(
       (interest) => !(interest.userId === userId && interest.propertyId === propertyId),
     ),
+  );
+  if (!removedReservation) return;
+  writeStorage(
+    PROPERTY_KEY,
+    getProperties().map((property) => {
+      if (property.id !== propertyId) return property;
+      const totalUnits = getTotalUnits(property);
+      const availableUnits = Math.min(totalUnits, getAvailableUnits(property) + 1);
+      return {
+        ...property,
+        totalUnits,
+        availableUnits,
+        availabilityStatus: getAvailabilityStatus({
+          ...property,
+          totalUnits,
+          availableUnits,
+        }),
+      };
+    }),
   );
 }
 

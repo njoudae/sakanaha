@@ -8,6 +8,11 @@ interface UploadTarget {
   thumbnailUploadUrl: string;
 }
 
+interface VideoUploadTarget {
+  mediaId: Id<"propertyMedia">;
+  uploadUrl: string;
+}
+
 interface ConvexMediaOperations {
   createUpload(args: {
     propertyId?: Id<"properties">;
@@ -32,6 +37,20 @@ interface ConvexMediaOperations {
     width: number;
     height: number;
   }): Promise<{ mediaId: Id<"propertyMedia">; url: string; thumbnailUrl: string }>;
+  createVideoUpload(args: {
+    propertyId?: Id<"properties">;
+    fileName: string;
+    mimeType: string;
+    byteSize: number;
+    checksum: string;
+  }): Promise<VideoUploadTarget>;
+  registerUploadedVideo(args: {
+    mediaId: Id<"propertyMedia">;
+    storageId: Id<"_storage">;
+  }): Promise<null>;
+  finalizeVideoUpload(args: {
+    mediaId: Id<"propertyMedia">;
+  }): Promise<{ mediaId: Id<"propertyMedia">; url: string }>;
 }
 
 function postBlob(
@@ -125,6 +144,45 @@ export function createConvexMediaService(operations: ConvexMediaOperations): Med
         }
       }
       throw lastError instanceof Error ? lastError : new Error("فشل رفع الصورة.");
+    },
+    async uploadVideo(file, options = {}) {
+      if (!["video/mp4", "video/webm", "video/quicktime"].includes(file.type)) {
+        throw new Error("صيغة الفيديو غير مدعومة.");
+      }
+      if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+        throw new Error("حجم الفيديو يجب ألا يتجاوز 10 ميجابايت.");
+      }
+      report(file.name, "preparing", 5, options.onProgress);
+      const checksum = Array.from(
+        new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())),
+      )
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+      let target = await operations.createVideoUpload({
+        propertyId: options.propertyId,
+        fileName: file.name,
+        mimeType: file.type,
+        byteSize: file.size,
+        checksum,
+      });
+      let lastError: unknown;
+      for (let attempt = 0; attempt <= 3; attempt += 1) {
+        try {
+          const storageId = await postBlob(target.uploadUrl, file, (loaded, total) =>
+            report(file.name, "uploading", (loaded / total) * 90, options.onProgress),
+          );
+          await operations.registerUploadedVideo({ mediaId: target.mediaId, storageId });
+          report(file.name, "processing", 95, options.onProgress);
+          const completed = await operations.finalizeVideoUpload({ mediaId: target.mediaId });
+          report(file.name, "complete", 100, options.onProgress);
+          return { ...completed, width: 0, height: 0 };
+        } catch (error) {
+          lastError = error;
+          if (attempt === 3) break;
+          target = await operations.retryUpload({ mediaId: target.mediaId });
+        }
+      }
+      throw lastError instanceof Error ? lastError : new Error("فشل رفع الفيديو.");
     },
   };
 }

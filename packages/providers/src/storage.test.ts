@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { hasExpectedImageSignature, validateImageUpload } from "./storage";
+import {
+  hasExpectedImageSignature,
+  hasExpectedVideoSignature,
+  validateImageUpload,
+  validateVideoUpload,
+} from "./storage";
 
 const config = {
   allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
@@ -32,5 +37,21 @@ describe("media upload validation", () => {
     expect(hasExpectedImageSignature(new TextEncoder().encode("<svg></svg>"), "image/jpeg")).toBe(
       false,
     );
+  });
+
+  it("validates video types, sizes, and magic bytes", () => {
+    expect(() =>
+      validateVideoUpload({ fileName: "tour.mp4", mimeType: "video/mp4", byteSize: 512 }, 1024),
+    ).not.toThrow();
+    expect(() =>
+      validateVideoUpload({ fileName: "tour.avi", mimeType: "video/avi", byteSize: 512 }, 1024),
+    ).toThrow(/not supported/);
+    expect(
+      hasExpectedVideoSignature(
+        new Uint8Array([0, 0, 0, 20, 0x66, 0x74, 0x79, 0x70, 0, 0, 0, 0]),
+        "video/mp4",
+      ),
+    ).toBe(true);
+    expect(hasExpectedVideoSignature(new TextEncoder().encode("<html>"), "video/mp4")).toBe(false);
   });
 });

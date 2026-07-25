@@ -5,6 +5,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 type DatabaseCtx = QueryCtx | MutationCtx;
 
 export const MAX_PROPERTY_IMAGES = 30;
+export const MAX_PROPERTY_VIDEOS = 10;
 export const MAX_UPLOAD_RETRIES = 3;
 export const UPLOAD_TTL_MS = 30 * 60 * 1000;
 

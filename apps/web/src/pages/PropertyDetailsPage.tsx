@@ -27,8 +27,10 @@ import {
   getPublicPropertyById,
   isFavoriteProperty,
   recordPropertyView,
+  reservePropertyUnit,
   toggleFavoriteProperty,
 } from "../services/propertyService";
+import { getAvailabilityStatus, getAvailableUnits } from "../services/propertyAvailability";
 import type { Property, UniversityLocation, User } from "@saknaha/shared-types";
 import { absoluteAppUrl, cityPath, propertyPath } from "../utils/routes";
 import {
@@ -141,8 +143,26 @@ export default function PropertyDetailsPage({
   const canUseWhatsapp =
     currentProperty.allowWhatsappContact && whatsappUrl(currentProperty.ownerPhone);
   const pageUrl = absoluteAppUrl(propertyPath(currentProperty.id));
+  const availableUnits = getAvailableUnits(currentProperty);
+  const availabilityStatus = getAvailabilityStatus(currentProperty);
 
   function recordInterest(mode: "whole-unit" | "roommate" | "visit" | "general") {
+    if (mode === "whole-unit") {
+      const reservation = reservePropertyUnit({
+        propertyId: currentProperty.id,
+        userId,
+      });
+      if (reservation.status === "full") {
+        setMessage("عذرًا، جميع الوحدات ممتلئة حاليًا.");
+      } else if (reservation.status === "already_reserved") {
+        setMessage("لديك حجز مسجل مسبقًا لهذه الوحدة.");
+      } else {
+        setMessage(
+          `تم تسجيل الحجز. الوحدات المتبقية: ${reservation.availableUnits.toLocaleString("ar-SA")}.`,
+        );
+      }
+      return;
+    }
     addInterest({ propertyId: currentProperty.id, userId, mode });
     if (mode === "roommate") {
       addRoommatePreference({
@@ -154,10 +174,6 @@ export default function PropertyDetailsPage({
       setMessage(
         "تم تسجيل اهتمامك بالروم ميت. سيتم حفظ الطلب ضمن بيانات السكن والمدينة للمتابعة لاحقًا.",
       );
-      return;
-    }
-    if (mode === "whole-unit") {
-      setMessage("تم تسجيل طلب حجز السكن كاملًا. الحجز والدفع الإلكتروني قريبًا.");
       return;
     }
     if (mode === "visit") {
@@ -420,6 +436,17 @@ export default function PropertyDetailsPage({
                 label="الحد الأعلى للسكان"
                 value={`${property.maxResidents.toLocaleString("ar-SA")}`}
               />
+              <Info label="عدد الوحدات المتاحة" value={availableUnits.toLocaleString("ar-SA")} />
+              <Info
+                label="حالة الإشغال"
+                value={
+                  availabilityStatus === "full"
+                    ? "ممتلئ"
+                    : availabilityStatus === "nearly_full"
+                      ? "شبه ممتلئ"
+                      : "متاح"
+                }
+              />
               <Info label="مفروش" value={property.furnished ? "نعم" : "لا"} />
               <Info label="المصعد" value={property.hasElevator ? "يوجد" : "لا يوجد"} />
               <Info label="عامل نظافة" value={property.hasCleaningWorker ? "يوجد" : "لا يوجد"} />
@@ -472,7 +499,7 @@ export default function PropertyDetailsPage({
           <button
             className="secondary-button"
             onClick={() => recordInterest("whole-unit")}
-            disabled={isOwnerPreview}
+            disabled={isOwnerPreview || availabilityStatus === "full"}
           >
             <Home size={18} aria-hidden="true" />
             حجز الآن

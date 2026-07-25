@@ -194,6 +194,11 @@ export default defineSchema(
       bathrooms: v.number(),
       furnished: v.boolean(),
       maxResidents: v.number(),
+      totalUnits: v.optional(v.number()),
+      availableUnits: v.optional(v.number()),
+      availabilityStatus: v.optional(
+        v.union(v.literal("available"), v.literal("nearly_full"), v.literal("full")),
+      ),
       roommateAllowed: v.boolean(),
       requiresLeaseContract: v.boolean(),
       price: v.number(),

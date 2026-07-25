@@ -23,4 +23,11 @@ export interface MediaService {
       onProgress?: (progress: MediaUploadProgress) => void;
     },
   ): Promise<UploadedMedia>;
+  uploadVideo(
+    file: File,
+    options?: {
+      propertyId?: Id<"properties">;
+      onProgress?: (progress: MediaUploadProgress) => void;
+    },
+  ): Promise<UploadedMedia>;
 }

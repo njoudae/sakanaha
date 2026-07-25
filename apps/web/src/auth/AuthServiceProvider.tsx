@@ -82,10 +82,13 @@ function ConvexAuthServiceBridge({
     authState.isAuthenticated ? {} : "skip",
   );
   const createMediaUpload = useMutation(api.media.createUpload);
+  const createVideoUpload = useMutation(api.media.createVideoUpload);
   const retryMediaUpload = useMutation(api.media.retryUpload);
   const registerUploadedImage = useMutation(api.media.registerUploadedImage);
+  const registerUploadedVideo = useMutation(api.media.registerUploadedVideo);
   const registerUploadedThumbnail = useMutation(api.media.registerUploadedThumbnail);
   const finalizeMediaUpload = useAction(api.media.finalizeUpload);
+  const finalizeVideoUpload = useAction(api.media.finalizeVideoUpload);
   const resolveGoogleMapsLocationLink = useAction(api.maps.resolveGoogleMapsLocationLink);
   const [userSearch, setUserSearch] = useState("");
   const [userRole, setUserRole] = useState<PlatformRole | "">("");
@@ -146,6 +149,9 @@ function ConvexAuthServiceBridge({
         registerUploadedImage,
         registerUploadedThumbnail,
         finalizeUpload: finalizeMediaUpload,
+        createVideoUpload,
+        registerUploadedVideo,
+        finalizeVideoUpload,
       }),
     [
       createMediaUpload,
@@ -153,6 +159,9 @@ function ConvexAuthServiceBridge({
       registerUploadedImage,
       registerUploadedThumbnail,
       finalizeMediaUpload,
+      createVideoUpload,
+      registerUploadedVideo,
+      finalizeVideoUpload,
     ],
   );
 

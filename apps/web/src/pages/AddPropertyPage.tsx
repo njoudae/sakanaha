@@ -1,4 +1,4 @@
-import { ArrowRight, Camera, ChevronDown, MapPinned, Trash2 } from "lucide-react";
+import { ArrowRight, Camera, ChevronDown, Loader2, MapPinned, Trash2, Video } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import Stepper from "../components/Stepper";
 import PropertyLocationPicker from "../components/PropertyLocationPicker";
@@ -27,7 +27,9 @@ import {
   parseGoogleMapsLocationUrl,
 } from "@saknaha/utils/directions";
 import { useMediaService } from "../media/MediaServiceContext";
+import type { MediaUploadProgress } from "../media/MediaService";
 import { useMapsData } from "../data/MapsDataContext";
+import { getAvailabilityStatus } from "../services/propertyAvailability";
 
 const steps = ["الموقع", "معلومات السكن", "السعر والصور", "المراجعة والنشر"];
 
@@ -85,6 +87,9 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
         bathrooms: 1,
         furnished: true,
         maxResidents: 3,
+        totalUnits: 3,
+        availableUnits: 3,
+        availabilityStatus: "available",
         roommateAllowed: true,
         requiresLeaseContract: true,
         price: 2000,
@@ -104,6 +109,9 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
         createdAt: new Date().toISOString(),
       },
   );
+  const [uploadProgress, setUploadProgress] = useState<Record<string, MediaUploadProgress>>({});
+  const [mediaError, setMediaError] = useState("");
+  const isUploading = Object.keys(uploadProgress).length > 0;
 
   const canGoNext = useMemo(() => {
     if (step === 0) {
@@ -133,11 +141,12 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
       return (
         selectedPrices.length > 0 &&
         selectedPrices.every((price) => typeof price === "number" && price > 0) &&
-        property.images.length > 0
+        property.images.length > 0 &&
+        !isUploading
       );
     }
     return true;
-  }, [property, step]);
+  }, [isUploading, property, step]);
 
   function update<K extends keyof Property>(key: K, value: Property[K]) {
     setProperty((current) => ({ ...current, [key]: value }));
@@ -178,16 +187,133 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
     update("maxRooms", Math.max(numeric, property.minRooms || 1));
   }
 
+  function updateUnitCount(value: string) {
+    const units = Number(value.replace(/\D/g, "")) || 0;
+    setProperty((current) => ({
+      ...current,
+      maxResidents: units,
+      totalUnits: units,
+      availableUnits: units,
+      availabilityStatus: getAvailabilityStatus({
+        ...current,
+        maxResidents: units,
+        totalUnits: units,
+        availableUnits: units,
+      }),
+    }));
+  }
+
   async function uploadImages(files: FileList | null) {
     if (!files?.length) return;
-    try {
-      const uploaded = await Promise.all(
-        Array.from(files).map((file) => mediaService.uploadImage(file)),
+    setMediaError("");
+    const selected = Array.from(files).map((file, index) => ({
+      file,
+      key: `image-${Date.now()}-${index}-${file.name}`,
+      previewUrl: URL.createObjectURL(file),
+    }));
+    setProperty((current) => ({
+      ...current,
+      images: [...current.images, ...selected.map((item) => item.previewUrl)],
+    }));
+    setUploadProgress((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        selected.map((item) => [
+          item.key,
+          { fileName: item.file.name, phase: "preparing" as const, percent: 0 },
+        ]),
+      ),
+    }));
+
+    const results = await Promise.allSettled(
+      selected.map((item) =>
+        mediaService.uploadImage(item.file, {
+          onProgress: (progress) =>
+            setUploadProgress((current) => ({ ...current, [item.key]: progress })),
+        }),
+      ),
+    );
+    setProperty((current) => {
+      const images = [...current.images];
+      selected.forEach((item, index) => {
+        const previewIndex = images.indexOf(item.previewUrl);
+        const result = results[index];
+        if (previewIndex < 0) return;
+        if (result.status === "fulfilled") images[previewIndex] = result.value.url;
+        else images.splice(previewIndex, 1);
+      });
+      return { ...current, images };
+    });
+    selected.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    setUploadProgress((current) => {
+      const next = { ...current };
+      selected.forEach((item) => delete next[item.key]);
+      return next;
+    });
+    const failed = results.filter((result) => result.status === "rejected");
+    if (failed.length > 0) {
+      const reason = failed[0]?.status === "rejected" ? failed[0].reason : null;
+      setMediaError(
+        reason instanceof Error
+          ? reason.message
+          : `تعذر رفع ${failed.length.toLocaleString("ar-SA")} من الصور. أعيدي المحاولة.`,
       );
-      update("images", [...property.images, ...uploaded.map((item) => item.url)]);
-    } catch (error) {
-      window.alert(
-        error instanceof Error ? error.message : "فشل رفع الصور. يرجى المحاولة مرة أخرى.",
+    }
+  }
+
+  async function uploadVideos(files: FileList | null) {
+    if (!files?.length) return;
+    setMediaError("");
+    const selected = Array.from(files).map((file, index) => ({
+      file,
+      key: `video-${Date.now()}-${index}-${file.name}`,
+      previewUrl: URL.createObjectURL(file),
+    }));
+    setProperty((current) => ({
+      ...current,
+      videos: [...(current.videos ?? []), ...selected.map((item) => item.previewUrl)],
+    }));
+    setUploadProgress((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        selected.map((item) => [
+          item.key,
+          { fileName: item.file.name, phase: "preparing" as const, percent: 0 },
+        ]),
+      ),
+    }));
+    const results = await Promise.allSettled(
+      selected.map((item) =>
+        mediaService.uploadVideo(item.file, {
+          onProgress: (progress) =>
+            setUploadProgress((current) => ({ ...current, [item.key]: progress })),
+        }),
+      ),
+    );
+    setProperty((current) => {
+      const videos = [...(current.videos ?? [])];
+      selected.forEach((item, index) => {
+        const previewIndex = videos.indexOf(item.previewUrl);
+        const result = results[index];
+        if (previewIndex < 0) return;
+        if (result.status === "fulfilled") videos[previewIndex] = result.value.url;
+        else videos.splice(previewIndex, 1);
+      });
+      return { ...current, videos };
+    });
+    selected.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    setUploadProgress((current) => {
+      const next = { ...current };
+      selected.forEach((item) => delete next[item.key]);
+      return next;
+    });
+    const failed = results.filter((result) => result.status === "rejected");
+    if (failed.length > 0) {
+      const reason = failed[0]?.status === "rejected" ? failed[0].reason : null;
+      setMediaError(
+        reason instanceof Error
+          ? reason.message
+          : `تعذر رفع ${failed.length.toLocaleString("ar-SA")} من الفيديوهات. أعيدي المحاولة.`,
       );
     }
   }
@@ -307,7 +433,12 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
         <form className="mt-6" onSubmit={stopFormSubmit}>
           {step === 0 ? <LocationStep property={property} update={update} /> : null}
           {step === 1 ? (
-            <DetailsStep property={property} update={update} updateRooms={updateRooms} />
+            <DetailsStep
+              property={property}
+              update={update}
+              updateRooms={updateRooms}
+              updateUnitCount={updateUnitCount}
+            />
           ) : null}
           {step === 2 ? (
             <MediaStep
@@ -315,6 +446,12 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
               update={update}
               updateRentalPrices={updateRentalPrices}
               uploadImages={uploadImages}
+              uploadVideos={uploadVideos}
+              uploadProgress={Object.entries(uploadProgress).map(([id, progress]) => ({
+                id,
+                progress,
+              }))}
+              mediaError={mediaError}
             />
           ) : null}
           {step === 3 ? <ReviewStep property={property} /> : null}
@@ -514,10 +651,12 @@ function DetailsStep({
   property,
   update,
   updateRooms,
+  updateUnitCount,
 }: {
   property: Property;
   update: UpdateFn;
   updateRooms: (key: "minRooms" | "maxRooms", value: string) => void;
+  updateUnitCount: (value: string) => void;
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -528,11 +667,11 @@ function DetailsStep({
         onChange={(value) => update("propertyType", value as PropertyType)}
       />
       <Input
-        label="العدد المتاح"
+        label="عدد الوحدات المتاحة"
         placeholder="مثال: 3"
-        value={property.maxResidents ? String(property.maxResidents) : ""}
+        value={property.availableUnits ? String(property.availableUnits) : ""}
         inputMode="numeric"
-        onChange={(value) => update("maxResidents", Number(value.replace(/\D/g, "")) || 0)}
+        onChange={updateUnitCount}
       />
       <Input
         label="عدد الغرف من"
@@ -569,11 +708,17 @@ function MediaStep({
   update,
   updateRentalPrices,
   uploadImages,
+  uploadVideos,
+  uploadProgress,
+  mediaError,
 }: {
   property: Property;
   update: UpdateFn;
   updateRentalPrices: (prices: RentalPrices) => void;
   uploadImages: (files: FileList | null) => void;
+  uploadVideos: (files: FileList | null) => void;
+  uploadProgress: Array<{ id: string; progress: MediaUploadProgress }>;
+  mediaError: string;
 }) {
   const prices = property.rentalPrices ?? normalizeRentalPrices(property);
 
@@ -633,6 +778,9 @@ function MediaStep({
           <Camera size={18} aria-hidden="true" />
           رفع صور السكن
         </span>
+        <span className="mb-2 block text-xs font-bold text-stone-500">
+          يمكنك اختيار أكثر من صورة دفعة واحدة، وستظهر هنا للمعاينة. أول صورة هي الغلاف.
+        </span>
         <input
           className="field"
           type="file"
@@ -679,6 +827,70 @@ function MediaStep({
           </div>
         ))}
       </div>
+
+      <label>
+        <span className="label inline-flex items-center gap-2">
+          <Video size={18} aria-hidden="true" />
+          رفع فيديو السكن
+        </span>
+        <span className="mb-2 block text-xs font-bold text-stone-500">
+          يمكنك اختيار أكثر من فيديو بصيغة MP4 أو WebM أو MOV.
+        </span>
+        <input
+          className="field"
+          type="file"
+          accept="video/mp4,video/webm,video/quicktime"
+          multiple
+          onChange={(event) => uploadVideos(event.target.files)}
+        />
+      </label>
+
+      {(property.videos ?? []).length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {(property.videos ?? []).map((video, index) => (
+            <div className="relative" key={`${video}-${index}`}>
+              <video
+                src={video}
+                controls
+                className="h-48 w-full rounded-2xl bg-stone-900 object-cover"
+              />
+              <button
+                className="danger-button absolute left-3 top-3 !min-h-10 !px-3"
+                type="button"
+                aria-label={`حذف الفيديو ${index + 1}`}
+                onClick={() =>
+                  update(
+                    "videos",
+                    (property.videos ?? []).filter((_, videoIndex) => videoIndex !== index),
+                  )
+                }
+              >
+                <Trash2 size={16} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {uploadProgress.length > 0 ? (
+        <div className="grid gap-2 rounded-2xl bg-linen p-4" aria-live="polite">
+          {uploadProgress.map(({ id, progress }) => (
+            <div className="flex items-center gap-3" key={id}>
+              <Loader2 className="animate-spin text-berry" size={18} aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
+                {progress.fileName}
+              </span>
+              <span className="text-xs font-black text-stone-500">{progress.percent}%</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {mediaError ? (
+        <p className="rounded-2xl bg-rose-50 p-4 text-sm font-bold text-rose-800" role="alert">
+          {mediaError}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -692,7 +904,10 @@ function ReviewStep({ property }: { property: Property }) {
     ["المعلم", property.landmark || "غير مضاف"],
     ["التصنيف", selectedClassificationLabel(property.classification)],
     ["نوع السكن", selectedPropertyTypeLabel(property.propertyType)],
-    ["العدد المتاح", property.maxResidents.toLocaleString("ar-SA")],
+    [
+      "عدد الوحدات المتاحة",
+      (property.availableUnits ?? property.maxResidents).toLocaleString("ar-SA"),
+    ],
     ["عدد الغرف", formatRooms(property)],
     ["الأسعار", formatRentalPrices(property)],
     ["رابط Google Maps", googleMapsUrl ? "مضاف" : "غير مضاف"],

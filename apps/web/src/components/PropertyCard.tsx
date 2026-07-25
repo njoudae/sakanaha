@@ -1,6 +1,7 @@
 import { BedDouble, GraduationCap, Heart, MapPin, Share2, Store } from "lucide-react";
 import type { Property } from "@saknaha/shared-types";
 import { formatRooms } from "@saknaha/utils/propertyFormat";
+import { getAvailabilityStatus } from "../services/propertyAvailability";
 
 type DisplayPropertyType = "عمارة" | "شقة" | "فندق" | "دور";
 type AvailabilityState = "available" | "nearlyFull" | "full";
@@ -73,20 +74,36 @@ function typeLabel(property: Property): DisplayPropertyType {
 
 function getPresentation(property: Property) {
   const special = specialCardPresentation[property.id];
-  if (special) return special;
+  const availability = getAvailabilityStatus(property);
+  const dynamicAvailability: AvailabilityState | null =
+    property.availableUnits === undefined
+      ? null
+      : availability === "nearly_full"
+        ? "nearlyFull"
+        : availability;
+  if (special) {
+    return {
+      ...special,
+      availability: dynamicAvailability ?? special.availability,
+    };
+  }
 
   if (!property.id.startsWith("mock-")) {
     return {
       type: typeLabel(property),
       title: classificationLabel(property),
-      availability: property.status === "published" ? ("available" as const) : ("full" as const),
+      availability:
+        dynamicAvailability ??
+        (property.status === "published" ? ("available" as const) : ("full" as const)),
     };
   }
 
   return {
     type: "عمارة" as const,
     title: "عمارة نسائية بالكامل",
-    availability: property.status === "published" ? ("available" as const) : ("full" as const),
+    availability:
+      dynamicAvailability ??
+      (property.status === "published" ? ("available" as const) : ("full" as const)),
   };
 }
 

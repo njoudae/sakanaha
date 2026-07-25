@@ -2,7 +2,9 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   createProviderConfiguration,
   hasExpectedImageSignature,
+  hasExpectedVideoSignature,
   validateImageUpload,
+  validateVideoUpload,
 } from "@saknaha/providers";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -10,6 +12,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { action, mutation, query } from "./_generated/server";
 import {
   MAX_PROPERTY_IMAGES,
+  MAX_PROPERTY_VIDEOS,
   MAX_UPLOAD_RETRIES,
   UPLOAD_TTL_MS,
   canManageProperty,
@@ -88,6 +91,126 @@ export const createUpload = mutation({
       updatedAt: now,
     });
     return { mediaId, expiresAt: now + UPLOAD_TTL_MS, ...(await createTargets(ctx)) };
+  },
+});
+
+export const createVideoUpload = mutation({
+  args: {
+    propertyId: v.optional(v.id("properties")),
+    fileName: v.string(),
+    mimeType: v.string(),
+    byteSize: v.number(),
+    checksum: v.optional(v.string()),
+  },
+  returns: v.object({
+    mediaId: v.id("propertyMedia"),
+    uploadUrl: v.string(),
+    expiresAt: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const profile = await requireActiveProfile(ctx);
+    const config = storageConfig();
+    validateVideoUpload(args, config.maxUploadBytes);
+    if (args.propertyId && !(await canManageProperty(ctx, profile._id, args.propertyId))) {
+      throw new Error("You do not have permission to upload media for this property.");
+    }
+    const existing = args.propertyId
+      ? await ctx.db
+          .query("propertyMedia")
+          .withIndex("by_property", (q) => q.eq("propertyId", args.propertyId))
+          .take(MAX_PROPERTY_IMAGES + MAX_PROPERTY_VIDEOS)
+      : [];
+    const activeVideos = existing.filter(
+      (media) =>
+        media.kind === "video" && media.deletedAt === undefined && media.status !== "deleted",
+    );
+    if (activeVideos.length >= MAX_PROPERTY_VIDEOS) {
+      throw new Error(`A property can contain at most ${MAX_PROPERTY_VIDEOS} videos.`);
+    }
+    const now = Date.now();
+    const mediaId = await ctx.db.insert("propertyMedia", {
+      propertyId: args.propertyId,
+      uploaderUserId: profile._id,
+      provider: "convex",
+      kind: "video",
+      originalFileName: args.fileName.trim(),
+      mimeType: args.mimeType,
+      byteSize: args.byteSize,
+      checksum: args.checksum,
+      status: "pending_upload",
+      scanStatus: "pending",
+      uploadExpiresAt: now + UPLOAD_TTL_MS,
+      retryCount: 0,
+      sortOrder: activeVideos.length,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const uploadUrl = await ctx.storage.generateUploadUrl();
+    return { mediaId, uploadUrl, expiresAt: now + UPLOAD_TTL_MS };
+  },
+});
+
+export const registerUploadedVideo = mutation({
+  args: {
+    mediaId: v.id("propertyMedia"),
+    storageId: v.id("_storage"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { media } = await requireMediaManager(ctx, args.mediaId);
+    if (
+      media.kind !== "video" ||
+      media.status !== "pending_upload" ||
+      (media.uploadExpiresAt ?? 0) < Date.now()
+    ) {
+      throw new Error("The video upload reservation has expired.");
+    }
+    const object = await ctx.db.system.get("_storage", args.storageId);
+    if (!object || object.contentType !== media.mimeType || object.size !== media.byteSize) {
+      throw new Error("The uploaded video does not match its reservation.");
+    }
+    await ctx.db.patch("propertyMedia", media._id, {
+      storageId: args.storageId,
+      status: "processing",
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+export const finalizeVideoUpload = action({
+  args: { mediaId: v.id("propertyMedia") },
+  returns: v.object({
+    mediaId: v.id("propertyMedia"),
+    url: v.string(),
+  }),
+  handler: async (ctx, args): Promise<{ mediaId: Id<"propertyMedia">; url: string }> => {
+    const media: Doc<"propertyMedia"> = await ctx.runQuery(
+      internal.mediaState.getVideoFinalizeContext,
+      { mediaId: args.mediaId },
+    );
+    if (media.kind !== "video" || !media.storageId) throw new Error("Video upload is incomplete.");
+    const blob = await ctx.storage.get(media.storageId);
+    try {
+      if (!blob) throw new Error("Uploaded video is missing.");
+      const bytes = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+      if (!hasExpectedVideoSignature(bytes, media.mimeType ?? "")) {
+        throw new Error("The uploaded video signature is invalid.");
+      }
+      await ctx.runMutation(internal.mediaState.approve, {
+        mediaId: media._id,
+        width: 0,
+        height: 0,
+      });
+      const url = await ctx.storage.getUrl(media.storageId);
+      if (!url) throw new Error("A secure video URL could not be created.");
+      return { mediaId: media._id, url };
+    } catch (error) {
+      if (media.storageId) await ctx.storage.delete(media.storageId);
+      const reason = error instanceof Error ? error.message : "Video processing failed.";
+      await ctx.runMutation(internal.mediaState.reject, { mediaId: media._id, reason });
+      throw new Error(reason, { cause: error });
+    }
   },
 });
 
