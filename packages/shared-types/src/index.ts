@@ -17,6 +17,9 @@ export type PaymentType = "شهري" | "سنوي" | "سنة دراسية";
 export type RentalPeriod = "daily" | "weekly" | "monthly" | "yearly";
 export type RentalPrices = Partial<Record<RentalPeriod, number>>;
 export type AvailabilityStatus = "available" | "nearly_full" | "full";
+export type PropertyFeature = "cleaning_worker" | "security_cameras" | "elevator";
+export type PropertyFacility = "mosque" | "grocery" | "supermarket" | "malls";
+export type RentIncludedUtility = "electricity" | "water" | "internet";
 export type ServiceType = "بقالة" | "مطعم" | "مغسلة" | "صيدلية" | "مواصلات" | "جامعة" | "غير ذلك";
 export type DistanceUnit = "meter" | "kilometer" | "walking_minutes" | "driving_minutes" | "hour";
 
@@ -78,6 +81,9 @@ export interface Property {
   floorsCount: number;
   hasElevator: boolean;
   hasCleaningWorker: boolean;
+  features?: PropertyFeature[];
+  facilities?: PropertyFacility[];
+  rentIncludes?: RentIncludedUtility[];
   hasTransportService: boolean;
   universityBusPasses: boolean;
   bathrooms: number;

@@ -128,8 +128,11 @@ export default function PropertyCard({
   const pricePeriod = isHotel ? "يوم" : "شهر";
 
   return (
-    <article className="group min-w-0 rounded-2xl bg-transparent text-right" dir="rtl">
-      <div className="relative overflow-hidden rounded-2xl bg-stone-100 shadow-sm">
+    <article
+      className="group flex h-full min-w-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white text-right shadow-sm"
+      dir="rtl"
+    >
+      <div className="relative overflow-hidden bg-stone-100">
         <button
           className="block w-full"
           onClick={() => onView(property)}
@@ -179,7 +182,7 @@ export default function PropertyCard({
       </div>
 
       <button
-        className="mt-3 block w-full text-right"
+        className="flex min-h-0 flex-1 flex-col px-3 pb-4 pt-3 text-right"
         onClick={() => onView(property)}
         type="button"
       >
@@ -219,7 +222,7 @@ export default function PropertyCard({
           ) : null}
         </div>
 
-        <p className="mt-3 text-base font-black text-ink">
+        <p className="mt-auto pt-3 text-base font-black text-ink">
           {price} ر.س <span className="font-bold text-stone-500">/ {pricePeriod}</span>
         </p>
       </button>

@@ -60,10 +60,11 @@ export const createUpload = mutation({
       ? await ctx.db
           .query("propertyMedia")
           .withIndex("by_property", (q) => q.eq("propertyId", args.propertyId))
-          .take(MAX_PROPERTY_IMAGES)
+          .take(MAX_PROPERTY_IMAGES + MAX_PROPERTY_VIDEOS)
       : [];
     const active = existing.filter(
-      (media) => media.deletedAt === undefined && media.status !== "deleted",
+      (media) =>
+        media.kind === "image" && media.deletedAt === undefined && media.status !== "deleted",
     );
     if (active.length >= MAX_PROPERTY_IMAGES) {
       throw new Error(`A property can contain at most ${MAX_PROPERTY_IMAGES} images.`);
@@ -357,16 +358,22 @@ export const attachToProperty = mutation({
     const existing = await ctx.db
       .query("propertyMedia")
       .withIndex("by_property", (q) => q.eq("propertyId", args.propertyId))
-      .take(MAX_PROPERTY_IMAGES);
-    if (
-      existing.filter((item) => item.status !== "deleted" && item.deletedAt === undefined).length >=
-      MAX_PROPERTY_IMAGES
-    ) {
-      throw new Error(`A property can contain at most ${MAX_PROPERTY_IMAGES} images.`);
+      .take(MAX_PROPERTY_IMAGES + MAX_PROPERTY_VIDEOS);
+    const activeOfKind = existing.filter(
+      (item) =>
+        item.kind === media.kind && item.status !== "deleted" && item.deletedAt === undefined,
+    );
+    const maximum = media.kind === "video" ? MAX_PROPERTY_VIDEOS : MAX_PROPERTY_IMAGES;
+    if (activeOfKind.length >= maximum) {
+      throw new Error(`A property can contain at most ${maximum} ${media.kind}s.`);
     }
-    const makeCover = args.makeCover || existing.every((item) => item.isCover !== true);
+    const images = existing.filter(
+      (item) => item.kind === "image" && item.status !== "deleted" && item.deletedAt === undefined,
+    );
+    const makeCover =
+      media.kind === "image" && (args.makeCover || images.every((item) => item.isCover !== true));
     if (makeCover) {
-      for (const item of existing) {
+      for (const item of images) {
         if (item.isCover)
           await ctx.db.patch("propertyMedia", item._id, { isCover: false, updatedAt: Date.now() });
       }
@@ -374,7 +381,7 @@ export const attachToProperty = mutation({
     await ctx.db.patch("propertyMedia", media._id, {
       propertyId: args.propertyId,
       isCover: makeCover,
-      sortOrder: existing.length,
+      sortOrder: activeOfKind.length,
       updatedAt: Date.now(),
     });
     return null;
@@ -385,15 +392,16 @@ export const setCover = mutation({
   args: { mediaId: v.id("propertyMedia") },
   handler: async (ctx, args) => {
     const { media, profile } = await requireMediaManager(ctx, args.mediaId);
+    if (media.kind !== "image") throw new Error("Only an image can be used as the cover.");
     if (!media.propertyId || !(await canManageProperty(ctx, profile._id, media.propertyId))) {
       throw new Error("You do not have permission to change this property.");
     }
     const items = await ctx.db
       .query("propertyMedia")
       .withIndex("by_property", (q) => q.eq("propertyId", media.propertyId))
-      .take(MAX_PROPERTY_IMAGES);
+      .take(MAX_PROPERTY_IMAGES + MAX_PROPERTY_VIDEOS);
     const now = Date.now();
-    for (const item of items) {
+    for (const item of items.filter((item) => item.kind === "image")) {
       if (item.isCover !== (item._id === media._id)) {
         await ctx.db.patch("propertyMedia", item._id, {
           isCover: item._id === media._id,
@@ -441,7 +449,7 @@ export const listForProperty = query({
     const items = await ctx.db
       .query("propertyMedia")
       .withIndex("by_property", (q) => q.eq("propertyId", property._id))
-      .take(MAX_PROPERTY_IMAGES);
+      .take(MAX_PROPERTY_IMAGES + MAX_PROPERTY_VIDEOS);
     const visible = items.filter(
       (item) => item.status === "approved" && item.deletedAt === undefined,
     );
@@ -453,6 +461,7 @@ export const listForProperty = query({
         )
         .map(async (item) => ({
           id: item._id,
+          kind: item.kind,
           url: item.storageId ? await ctx.storage.getUrl(item.storageId) : (item.legacyUrl ?? null),
           thumbnailUrl: item.thumbnailStorageId
             ? await ctx.storage.getUrl(item.thumbnailStorageId)

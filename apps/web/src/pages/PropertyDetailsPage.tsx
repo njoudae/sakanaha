@@ -2,6 +2,7 @@ import {
   ArrowRight,
   Building2,
   CalendarDays,
+  Check,
   ChevronLeft,
   ChevronRight,
   Heart,
@@ -40,6 +41,12 @@ import {
   getRentalPrices,
   rentalPeriodLabels,
 } from "@saknaha/utils/propertyFormat";
+import {
+  getPropertyFeatures,
+  propertyFacilityOptions,
+  propertyFeatureOptions,
+  rentIncludedOptions,
+} from "../services/propertyAmenities";
 
 interface PropertyDetailsPageProps {
   propertyId: string;
@@ -397,6 +404,10 @@ export default function PropertyDetailsPage({
                       key={video}
                       src={video}
                       controls
+                      controlsList="nodownload noremoteplayback"
+                      disablePictureInPicture
+                      onContextMenu={(event) => event.preventDefault()}
+                      preload="metadata"
                       className="h-64 w-full rounded-2xl bg-stone-900 object-cover"
                     />
                   ))}
@@ -455,6 +466,27 @@ export default function PropertyDetailsPage({
                 value={property.universityBusPasses ? "يمر عليه" : "لا يمر عليه"}
               />
             </dl>
+
+            <div className="mt-4 grid gap-3">
+              <AmenityGroup
+                title="مميزات السكن"
+                items={propertyFeatureOptions
+                  .filter(({ value }) => getPropertyFeatures(property).includes(value))
+                  .map(({ label }) => label)}
+              />
+              <AmenityGroup
+                title="المرافق القريبة"
+                items={propertyFacilityOptions
+                  .filter(({ value }) => property.facilities?.includes(value))
+                  .map(({ label }) => label)}
+              />
+              <AmenityGroup
+                title="الإيجار يشمل"
+                items={rentIncludedOptions
+                  .filter(({ value }) => property.rentIncludes?.includes(value))
+                  .map(({ label }) => label)}
+              />
+            </div>
 
             <div className="mt-4 rounded-2xl bg-linen p-4">
               <p className="font-black text-ink">الخدمات القريبة</p>
@@ -619,6 +651,26 @@ export default function PropertyDetailsPage({
         allowExactLocation={isOwnerPreview}
       />
     </main>
+  );
+}
+
+function AmenityGroup({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section className="rounded-2xl border border-stone-100 bg-white p-4">
+      <h3 className="font-black text-ink">{title}</h3>
+      <ul className="mt-3 flex flex-wrap gap-2">
+        {items.map((item) => (
+          <li
+            key={item}
+            className="inline-flex items-center gap-1.5 rounded-full bg-linen px-3 py-2 text-sm font-bold text-ink"
+          >
+            <Check size={15} className="text-berry" aria-hidden="true" />
+            {item}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

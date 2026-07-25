@@ -5,7 +5,6 @@ const OWNER_KEY = "saknaha.owners";
 const USER_KEY = "saknaha.users";
 const CURRENT_OWNER_KEY = "saknaha.currentOwner";
 const CURRENT_USER_KEY = "saknaha.currentUser";
-const TEST_PHONE = "0582968140";
 export const DEVELOPMENT_ADMIN_PHONE = "0582968141";
 const DEVELOPMENT_ADMIN_ENABLED =
   import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEVELOPMENT_ADMIN === "true";
@@ -14,47 +13,28 @@ function normalizePhone(phone: string): string {
   return phone.trim().replace(/\s+/g, "");
 }
 
-function ensureTestOwner(): Owner {
+function removeLegacyTestAccounts() {
   const owners = readStorage<Owner[]>(OWNER_KEY, []);
-  const existing = owners.find((item) => normalizePhone(item.phone) === TEST_PHONE);
-  if (existing) {
-    writeStorage(CURRENT_OWNER_KEY, existing);
-    return existing;
+  const realOwners = owners.filter(
+    (owner) => owner.ministryPropertyNumber !== "TEST-OWNER-0582968140",
+  );
+  if (realOwners.length !== owners.length) {
+    writeStorage(OWNER_KEY, realOwners);
+    const currentOwner = readStorage<Owner | null>(CURRENT_OWNER_KEY, null);
+    if (currentOwner?.ministryPropertyNumber === "TEST-OWNER-0582968140") {
+      localStorage.removeItem(CURRENT_OWNER_KEY);
+    }
   }
 
-  const owner: Owner = {
-    id: makeId("owner"),
-    fullName: "نجود - حساب اختبار المالك",
-    phone: TEST_PHONE,
-    ministryPropertyNumber: "TEST-OWNER-0582968140",
-    createdAt: new Date().toISOString(),
-  };
-  writeStorage(OWNER_KEY, [owner, ...owners]);
-  writeStorage(CURRENT_OWNER_KEY, owner);
-  return owner;
-}
-
-function ensureTestUser(): User {
   const users = readStorage<User[]>(USER_KEY, []);
-  const existing = users.find((item) => normalizePhone(item.phone) === TEST_PHONE);
-  if (existing) {
-    writeStorage(CURRENT_USER_KEY, existing);
-    return existing;
+  const realUsers = users.filter((user) => user.name !== "نجود - حساب اختبار الطالبة");
+  if (realUsers.length !== users.length) {
+    writeStorage(USER_KEY, realUsers);
+    const currentUser = readStorage<User | null>(CURRENT_USER_KEY, null);
+    if (currentUser?.name === "نجود - حساب اختبار الطالبة") {
+      localStorage.removeItem(CURRENT_USER_KEY);
+    }
   }
-
-  const user: User = {
-    id: makeId("user"),
-    name: "نجود - حساب اختبار الطالبة",
-    phone: TEST_PHONE,
-    role: "student",
-    city: "أبها",
-    monthlyBudget: 2500,
-    acceptsRoommate: true,
-    createdAt: new Date().toISOString(),
-  };
-  writeStorage(USER_KEY, [user, ...users]);
-  writeStorage(CURRENT_USER_KEY, user);
-  return user;
 }
 
 function ensureDevelopmentAdmin(): User {
@@ -93,16 +73,18 @@ export function registerOwner(input: Omit<Owner, "id" | "createdAt">): Owner {
 }
 
 export function getCurrentOwner(): Owner | null {
+  removeLegacyTestAccounts();
   return readStorage<Owner | null>(CURRENT_OWNER_KEY, null);
 }
 
 export function getAllOwners(): Owner[] {
+  removeLegacyTestAccounts();
   return readStorage<Owner[]>(OWNER_KEY, []);
 }
 
 export function loginOwner(phone: string): Owner | null {
+  removeLegacyTestAccounts();
   const normalizedPhone = normalizePhone(phone);
-  if (normalizedPhone === TEST_PHONE) return ensureTestOwner();
   const owner = readStorage<Owner[]>(OWNER_KEY, []).find(
     (item) => normalizePhone(item.phone) === normalizedPhone,
   );
@@ -131,10 +113,12 @@ export function registerUser(input: Omit<User, "id" | "createdAt">): User {
 }
 
 export function getCurrentUser(): User | null {
+  removeLegacyTestAccounts();
   return readStorage<User | null>(CURRENT_USER_KEY, null);
 }
 
 export function getAllUsers(): User[] {
+  removeLegacyTestAccounts();
   return readStorage<User[]>(USER_KEY, []);
 }
 
@@ -179,11 +163,11 @@ export function updateUserUniversityPreference(
 }
 
 export function loginUser(phone: string): User | null {
+  removeLegacyTestAccounts();
   const normalizedPhone = normalizePhone(phone);
   if (normalizedPhone === DEVELOPMENT_ADMIN_PHONE && DEVELOPMENT_ADMIN_ENABLED) {
     return ensureDevelopmentAdmin();
   }
-  if (normalizedPhone === TEST_PHONE) return ensureTestUser();
   const user = readStorage<User[]>(USER_KEY, []).find(
     (item) => normalizePhone(item.phone) === normalizedPhone,
   );

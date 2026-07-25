@@ -43,7 +43,7 @@ export default function RoommateListingCard({ listing, onDetails }: RoommateList
 
   return (
     <article
-      className="relative flex h-full min-h-[300px] flex-col rounded-2xl border border-stone-200 bg-white p-5 text-right shadow-sm"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white p-5 text-right shadow-sm"
       dir="rtl"
     >
       <button
@@ -94,7 +94,7 @@ export default function RoommateListingCard({ listing, onDetails }: RoommateList
         </span>
       </div>
 
-      <p className="mt-4 line-clamp-3 min-h-[4.8rem] text-sm font-bold leading-7 text-stone-600">
+      <p className="mt-4 line-clamp-3 min-h-[4.8rem] flex-1 text-sm font-bold leading-7 text-stone-600">
         {request.bio}
       </p>
     </article>

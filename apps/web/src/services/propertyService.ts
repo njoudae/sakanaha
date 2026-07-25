@@ -1,4 +1,3 @@
-import { mockProperties } from "@saknaha/constants/mockProperties";
 import type {
   DistanceUnit,
   FavoriteProperty,
@@ -21,6 +20,7 @@ import {
   getTotalUnits,
   withNormalizedInventory,
 } from "./propertyAvailability";
+import { getPropertyFeatures } from "./propertyAmenities";
 
 const PROPERTY_KEY = "saknaha.properties";
 const INTEREST_KEY = "saknaha.interests";
@@ -32,18 +32,60 @@ const PROPERTY_VIEW_KEY = "saknaha.propertyViews";
 const ROOMMATE_VIEW_KEY = "saknaha.roommateViews";
 const ROOMMATE_JOIN_REQUEST_KEY = "saknaha.roommateJoinRequests";
 
-export function getProperties(): Property[] {
-  const saved = readStorage<Property[]>(PROPERTY_KEY, []);
-  if (saved.length > 0) {
-    const normalized = saved.map(normalizeProperty);
-    const savedIds = new Set(normalized.map((property) => property.id));
-    const missingMockProperties = mockProperties.filter((property) => !savedIds.has(property.id));
-    const merged = [...normalized, ...missingMockProperties];
-    writeStorage(PROPERTY_KEY, merged);
-    return merged;
+function hasLegacyPropertyId(value: string | undefined) {
+  return value?.startsWith("mock-") === true;
+}
+
+function cleanupLegacyDemoReferences() {
+  const interests = readStorage<Interest[]>(INTEREST_KEY, []);
+  const realInterests = interests.filter((item) => !hasLegacyPropertyId(item.propertyId));
+  if (realInterests.length !== interests.length) writeStorage(INTEREST_KEY, realInterests);
+
+  const favorites = readStorage<FavoriteProperty[]>(FAVORITE_KEY, []);
+  const realFavorites = favorites.filter((item) => !hasLegacyPropertyId(item.propertyId));
+  if (realFavorites.length !== favorites.length) writeStorage(FAVORITE_KEY, realFavorites);
+
+  const preferences = readStorage<RoommatePreference[]>(ROOMMATE_KEY, []);
+  const realPreferences = preferences.filter((item) => !hasLegacyPropertyId(item.propertyId));
+  if (realPreferences.length !== preferences.length) writeStorage(ROOMMATE_KEY, realPreferences);
+
+  const negotiations = readStorage<NegotiationSignal[]>(NEGOTIATION_KEY, []);
+  const realNegotiations = negotiations.filter((item) => !hasLegacyPropertyId(item.propertyId));
+  if (realNegotiations.length !== negotiations.length)
+    writeStorage(NEGOTIATION_KEY, realNegotiations);
+
+  const propertyViews = readStorage<PropertyView[]>(PROPERTY_VIEW_KEY, []);
+  const realPropertyViews = propertyViews.filter((item) => !hasLegacyPropertyId(item.propertyId));
+  if (realPropertyViews.length !== propertyViews.length) {
+    writeStorage(PROPERTY_VIEW_KEY, realPropertyViews);
   }
-  writeStorage(PROPERTY_KEY, mockProperties);
-  return mockProperties;
+
+  const roommateViews = readStorage<RoommateRequestView[]>(ROOMMATE_VIEW_KEY, []);
+  const realRoommateViews = roommateViews.filter(
+    (item) => !item.requestId.startsWith("demo-roommate-"),
+  );
+  if (realRoommateViews.length !== roommateViews.length) {
+    writeStorage(ROOMMATE_VIEW_KEY, realRoommateViews);
+  }
+
+  const joinRequests = readStorage<RoommateJoinRequest[]>(ROOMMATE_JOIN_REQUEST_KEY, []);
+  const realJoinRequests = joinRequests.filter(
+    (item) => !hasLegacyPropertyId(item.propertyId) && !item.requestId.startsWith("demo-roommate-"),
+  );
+  if (realJoinRequests.length !== joinRequests.length) {
+    writeStorage(ROOMMATE_JOIN_REQUEST_KEY, realJoinRequests);
+  }
+}
+
+export function getProperties(): Property[] {
+  cleanupLegacyDemoReferences();
+  const saved = readStorage<Property[]>(PROPERTY_KEY, []);
+  const realProperties = saved.filter(
+    (property) => property.ownerId !== "mock-owner" && !property.id.startsWith("mock-"),
+  );
+  const normalized = realProperties.map(normalizeProperty);
+  if (realProperties.length !== saved.length) writeStorage(PROPERTY_KEY, normalized);
+  return normalized;
 }
 
 function normalizeProperty(property: Property & { rooms?: number }): Property {
@@ -66,6 +108,9 @@ function normalizeProperty(property: Property & { rooms?: number }): Property {
     floorsCount: property.floorsCount ?? 1,
     hasElevator: property.hasElevator ?? false,
     hasCleaningWorker: property.hasCleaningWorker ?? false,
+    features: getPropertyFeatures(property),
+    facilities: property.facilities ?? [],
+    rentIncludes: property.rentIncludes ?? [],
     hasTransportService: property.hasTransportService ?? false,
     universityBusPasses: property.universityBusPasses ?? false,
     requiresLeaseContract: property.requiresLeaseContract ?? property.roommateAllowed ?? true,
@@ -74,11 +119,7 @@ function normalizeProperty(property: Property & { rooms?: number }): Property {
     videos: property.videos ?? [],
     services: property.services.map(normalizeService),
   };
-  return property.ownerId === "mock-owner" &&
-    property.totalUnits === undefined &&
-    property.availableUnits === undefined
-    ? normalized
-    : withNormalizedInventory(normalized);
+  return withNormalizedInventory(normalized);
 }
 
 function normalizeService(service: ServiceNearby & { distance?: string }): ServiceNearby {
@@ -111,7 +152,7 @@ export function getPublishedProperties(): Property[] {
 }
 
 export function getOwnerSubmittedPublishedProperties(): Property[] {
-  return getPublishedProperties().filter((property) => property.ownerId !== "mock-owner");
+  return getPublishedProperties();
 }
 
 export function getPropertyById(id: string): Property | null {
@@ -355,62 +396,6 @@ export function addRoommatePreference(
   return preference;
 }
 
-function demoRoommateRequests(): RoommateRequest[] {
-  const demoInputs = [
-    {
-      propertyId: "mock-badee",
-      userType: "student" as const,
-      requesterName: "أريج",
-      age: 21,
-      organization: "جامعة الملك خالد - قريقر",
-      major: "حاسب",
-      moveInDate: "سبتمبر 2026",
-      bio: "طالبة هادئة وأفضل السكن المنظم والقريب من الجامعة.",
-      availableRooms: 2,
-    },
-    {
-      propertyId: "mock-nuzhah",
-      userType: "employee" as const,
-      requesterName: "نورة",
-      age: 25,
-      organization: "مقر عمل في أبها",
-      major: "",
-      moveInDate: "أغسطس 2026",
-      bio: "موظفة أبحث عن شريكات سكن ملتزمات وبيئة مريحة.",
-      availableRooms: 2,
-    },
-    {
-      propertyId: "mock-king-road",
-      userType: "student" as const,
-      requesterName: "رهف",
-      age: 22,
-      organization: "جامعة الملك خالد - طريق الملك",
-      major: "إدارة أعمال",
-      moveInDate: "سبتمبر 2026",
-      bio: "أبحث عن سكن مشترك قريب من الجامعة وبميزانية واضحة.",
-      availableRooms: 1,
-    },
-  ];
-
-  return demoInputs.map((request, index) => ({
-    ...request,
-    id: `demo-roommate-${index + 1}`,
-    userId: `demo-user-${index + 1}`,
-    region: "منطقة عسير",
-    city: "أبها",
-    district:
-      request.propertyId === "mock-badee"
-        ? "حي البديع"
-        : request.propertyId === "mock-nuzhah"
-          ? "حي النزهة"
-          : "طريق الملك",
-    universityBranchId: index === 0 ? "kku-quraiger" : index === 2 ? "kku-king-road" : undefined,
-    publicationStatus: "approved" as const,
-    submittedAt: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-  }));
-}
-
 export function getRoommateRequests(): RoommateRequest[] {
   return getAllRoommateRequests().filter(
     (request) => (request.publicationStatus ?? "approved") === "approved",
@@ -419,11 +404,14 @@ export function getRoommateRequests(): RoommateRequest[] {
 
 export function getAllRoommateRequests(): RoommateRequest[] {
   const saved = readStorage<RoommateRequest[]>(ROOMMATE_REQUEST_KEY, []);
-  const savedIds = new Set(saved.map((request) => request.id));
-  const demos = demoRoommateRequests().filter((request) => !savedIds.has(request.id));
-  const merged = [...saved, ...demos];
-  writeStorage(ROOMMATE_REQUEST_KEY, merged);
-  return merged;
+  const realRequests = saved.filter(
+    (request) =>
+      !request.id.startsWith("demo-roommate-") &&
+      !request.userId.startsWith("demo-user-") &&
+      !request.propertyId?.startsWith("mock-"),
+  );
+  if (realRequests.length !== saved.length) writeStorage(ROOMMATE_REQUEST_KEY, realRequests);
+  return realRequests;
 }
 
 export function getRoommateRequestById(id: string): RoommateRequest | null {

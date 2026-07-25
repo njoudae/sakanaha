@@ -189,6 +189,28 @@ export default defineSchema(
       floorsCount: v.number(),
       hasElevator: v.boolean(),
       hasCleaningWorker: v.boolean(),
+      features: v.optional(
+        v.array(
+          v.union(
+            v.literal("cleaning_worker"),
+            v.literal("security_cameras"),
+            v.literal("elevator"),
+          ),
+        ),
+      ),
+      facilities: v.optional(
+        v.array(
+          v.union(
+            v.literal("mosque"),
+            v.literal("grocery"),
+            v.literal("supermarket"),
+            v.literal("malls"),
+          ),
+        ),
+      ),
+      rentIncludes: v.optional(
+        v.array(v.union(v.literal("electricity"), v.literal("water"), v.literal("internet"))),
+      ),
       hasTransportService: v.boolean(),
       universityBusPasses: v.boolean(),
       bathrooms: v.number(),

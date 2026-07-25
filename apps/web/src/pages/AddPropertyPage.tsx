@@ -8,7 +8,10 @@ import type {
   Owner,
   Property,
   PropertyClassification,
+  PropertyFacility,
+  PropertyFeature,
   PropertyType,
+  RentIncludedUtility,
   RentalPeriod,
   RentalPrices,
 } from "@saknaha/shared-types";
@@ -30,6 +33,11 @@ import { useMediaService } from "../media/MediaServiceContext";
 import type { MediaUploadProgress } from "../media/MediaService";
 import { useMapsData } from "../data/MapsDataContext";
 import { getAvailabilityStatus } from "../services/propertyAvailability";
+import {
+  propertyFacilityOptions,
+  propertyFeatureOptions,
+  rentIncludedOptions,
+} from "../services/propertyAmenities";
 
 const steps = ["الموقع", "معلومات السكن", "السعر والصور", "المراجعة والنشر"];
 
@@ -82,6 +90,9 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
         floorsCount: 1,
         hasElevator: false,
         hasCleaningWorker: false,
+        features: [],
+        facilities: [],
+        rentIncludes: [],
         hasTransportService: false,
         universityBusPasses: false,
         bathrooms: 1,
@@ -658,6 +669,15 @@ function DetailsStep({
   updateRooms: (key: "minRooms" | "maxRooms", value: string) => void;
   updateUnitCount: (value: string) => void;
 }) {
+  function toggleFeature(value: PropertyFeature, checked: boolean) {
+    const features = checked
+      ? [...new Set([...(property.features ?? []), value])]
+      : (property.features ?? []).filter((item) => item !== value);
+    update("features", features);
+    if (value === "cleaning_worker") update("hasCleaningWorker", checked);
+    if (value === "elevator") update("hasElevator", checked);
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <Select
@@ -699,7 +719,77 @@ function DetailsStep({
         checked={property.furnished}
         onChange={(value) => update("furnished", value)}
       />
+      <ChecklistGroup
+        legend="مميزات السكن"
+        options={propertyFeatureOptions}
+        selected={property.features ?? []}
+        onToggle={toggleFeature}
+      />
+      <ChecklistGroup
+        legend="المرافق القريبة"
+        options={propertyFacilityOptions}
+        selected={property.facilities ?? []}
+        onToggle={(value, checked) =>
+          update(
+            "facilities",
+            checked
+              ? [...new Set([...(property.facilities ?? []), value])]
+              : (property.facilities ?? []).filter((item) => item !== value),
+          )
+        }
+      />
+      <ChecklistGroup
+        legend="الإيجار يشمل"
+        options={rentIncludedOptions}
+        selected={property.rentIncludes ?? []}
+        onToggle={(value, checked) =>
+          update(
+            "rentIncludes",
+            checked
+              ? [...new Set([...(property.rentIncludes ?? []), value])]
+              : (property.rentIncludes ?? []).filter((item) => item !== value),
+          )
+        }
+      />
     </div>
+  );
+}
+
+function ChecklistGroup<T extends PropertyFeature | PropertyFacility | RentIncludedUtility>({
+  legend,
+  options,
+  selected,
+  onToggle,
+}: {
+  legend: string;
+  options: Array<{ value: T; label: string }>;
+  selected: T[];
+  onToggle: (value: T, checked: boolean) => void;
+}) {
+  return (
+    <fieldset className="rounded-2xl border border-stone-200 bg-linen p-4 md:col-span-2 xl:col-span-3">
+      <legend className="px-2 text-sm font-black text-ink">{legend}</legend>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {options.map((option) => (
+          <label
+            key={option.value}
+            className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 font-black transition ${
+              selected.includes(option.value)
+                ? "border-berry bg-white text-berry"
+                : "border-stone-200 bg-white/80 text-ink"
+            }`}
+          >
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-berry"
+              checked={selected.includes(option.value)}
+              onChange={(event) => onToggle(option.value, event.target.checked)}
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
@@ -852,6 +942,10 @@ function MediaStep({
               <video
                 src={video}
                 controls
+                controlsList="nodownload noremoteplayback"
+                disablePictureInPicture
+                onContextMenu={(event) => event.preventDefault()}
+                preload="metadata"
                 className="h-48 w-full rounded-2xl bg-stone-900 object-cover"
               />
               <button
@@ -910,6 +1004,27 @@ function ReviewStep({ property }: { property: Property }) {
     ],
     ["عدد الغرف", formatRooms(property)],
     ["الأسعار", formatRentalPrices(property)],
+    [
+      "مميزات السكن",
+      propertyFeatureOptions
+        .filter(({ value }) => property.features?.includes(value))
+        .map(({ label }) => label)
+        .join("، ") || "غير محددة",
+    ],
+    [
+      "المرافق القريبة",
+      propertyFacilityOptions
+        .filter(({ value }) => property.facilities?.includes(value))
+        .map(({ label }) => label)
+        .join("، ") || "غير محددة",
+    ],
+    [
+      "الإيجار يشمل",
+      rentIncludedOptions
+        .filter(({ value }) => property.rentIncludes?.includes(value))
+        .map(({ label }) => label)
+        .join("، ") || "غير محدد",
+    ],
     ["رابط Google Maps", googleMapsUrl ? "مضاف" : "غير مضاف"],
     [
       "الإحداثيات",
