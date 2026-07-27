@@ -16,6 +16,7 @@ import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { cityNames } from "@saknaha/constants/cities";
 import UniversityReferenceSelector from "../components/UniversityReferenceSelector";
+import RoommatePreferencesFields from "../components/RoommatePreferencesFields";
 import {
   getUserActivity,
   deleteRoommateCard,
@@ -24,8 +25,14 @@ import {
   updateRoommateJoinRequestStatus,
   updateRoommateCard,
 } from "../services/propertyService";
-import { updateUserProfile } from "../services/userService";
-import type { PublicationStatus, UniversityLocation, User } from "@saknaha/shared-types";
+import { updateUserProfile, updateUserRoommatePreferences } from "../services/userService";
+import type {
+  PublicationStatus,
+  RoommateLifestylePreferences,
+  UniversityLocation,
+  User,
+} from "@saknaha/shared-types";
+import { defaultRoommatePreferences } from "../services/roommatePreferenceDefaults";
 
 interface UserDashboardPageProps {
   user: User;
@@ -57,6 +64,10 @@ export default function UserDashboardPage({
   const [profileName, setProfileName] = useState(user.name);
   const [profileCity, setProfileCity] = useState(user.city);
   const [profileMessage, setProfileMessage] = useState("");
+  const [dashboardPreferences, setDashboardPreferences] = useState<RoommateLifestylePreferences>(
+    user.roommatePreferences ?? defaultRoommatePreferences,
+  );
+  const [preferencesMessage, setPreferencesMessage] = useState("");
   const [editingCardId, setEditingCardId] = useState("");
   const [cardCity, setCardCity] = useState("");
   const [cardNeighborhood, setCardNeighborhood] = useState("");
@@ -69,12 +80,12 @@ export default function UserDashboardPage({
   const incomingRequests = activity.roommateCards.flatMap((card) => card.incomingRequests);
   const totalCardViews = activity.roommateCards.reduce((sum, card) => sum + card.views, 0);
   const pendingIncoming = incomingRequests.filter((request) => request.status === "pending").length;
-  const acceptedSent = activity.sentJoinRequests.filter(
-    (item) => item.joinRequest.status === "accepted",
+  const bookedUnits = activity.interests.filter(
+    (item) => item.interest.mode === "whole-unit",
   ).length;
 
   function updateJoinStatus(id: string, status: "accepted" | "rejected") {
-    updateRoommateJoinRequestStatus(id, status);
+    updateRoommateJoinRequestStatus(id, user.id, status);
     setActivityVersion((version) => version + 1);
   }
 
@@ -97,6 +108,16 @@ export default function UserDashboardPage({
   function removeInterest(propertyId: string) {
     removeUserInterest(user.id, propertyId);
     setActivityVersion((version) => version + 1);
+  }
+
+  function saveDashboardPreferences() {
+    const updated = updateUserRoommatePreferences(user.id, dashboardPreferences);
+    if (!updated) {
+      setPreferencesMessage("تعذر حفظ التفضيلات.");
+      return;
+    }
+    onUserUpdated(updated);
+    setPreferencesMessage("تم حفظ تفضيلات شريكة السكن.");
   }
 
   function removeFavorite(propertyId: string) {
@@ -160,13 +181,18 @@ export default function UserDashboardPage({
   }
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-12" dir="rtl">
+    <main className="mx-auto w-full px-0 py-0" dir="rtl" id="user-dashboard-overview">
       <section className="rounded-3xl border border-stone-200 bg-white/95 p-5 text-right shadow-sm md:p-7">
         <p className="text-sm font-black text-berry">لوحة الباحثة عن سكن</p>
         <div className="mt-2 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-black text-ink">مرحباً {user.name}</h1>
+            <h1 className="text-2xl font-black text-ink">مرحباً {user.name}</h1>
             <p className="mt-2 text-sm font-bold text-stone-600">المنطقة الحالية: {user.city}</p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-stone-500">
+              {user.publicCode ? <span dir="ltr">رقم المستخدمة: {user.publicCode}</span> : null}
+              <span dir="ltr">الجوال: {user.phone}</span>
+              {user.email ? <span dir="ltr">البريد: {user.email}</span> : null}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -254,8 +280,33 @@ export default function UserDashboardPage({
         />
       </section>
 
-      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section
+        id="user-preferences"
+        className="mt-6 rounded-xl border border-stone-200 bg-white p-5 text-right shadow-sm"
+      >
+        <SectionTitle title="تفضيلات شريكة السكن" />
+        <p className="mt-2 text-sm font-bold text-stone-600">
+          تُستخدم هذه القيم تلقائياً عند إنشاء بطاقة أو إرسال طلب انضمام.
+        </p>
+        <div className="mt-4">
+          <RoommatePreferencesFields
+            value={dashboardPreferences}
+            onChange={setDashboardPreferences}
+            legend="تفضيلاتك المحفوظة"
+          />
+        </div>
+        <button className="primary-button mt-4" onClick={saveDashboardPreferences} type="button">
+          <Save size={17} aria-hidden="true" />
+          حفظ التفضيلات
+        </button>
+        {preferencesMessage ? (
+          <p className="mt-3 text-sm font-black text-mintdeep">{preferencesMessage}</p>
+        ) : null}
+      </section>
+
+      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <StatCard icon={Heart} title="السكن المحفوظ" value={activity.favorites.length} />
+        <StatCard icon={Home} title="الوحدات المحجوزة" value={bookedUnits} />
         <StatCard icon={Inbox} title="اهتمامات السكن" value={activity.interests.length} />
         <StatCard icon={UsersRound} title="بطاقاتي" value={activity.roommateCards.length} />
         <StatCard icon={Eye} title="مشاهدات بطاقاتي" value={totalCardViews} />
@@ -263,7 +314,10 @@ export default function UserDashboardPage({
       </section>
 
       <section className="mt-6 grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-3xl border border-stone-200 bg-white p-5 text-right shadow-sm">
+        <div
+          id="user-roommate-cards"
+          className="rounded-3xl border border-stone-200 bg-white p-5 text-right shadow-sm"
+        >
           <SectionTitle title="بطاقات شريكة السكن التي أنشأتيها" />
           {cardMessage ? (
             <p className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-mintdeep">
@@ -416,6 +470,26 @@ export default function UserDashboardPage({
                             <p className="text-xs font-bold text-stone-500">
                               الحالة: {statusLabel(request.status)}
                             </p>
+                            {typeof request.compatibilityScore === "number" ? (
+                              <p className="mt-1 text-sm font-black text-berry">
+                                التوافق: {request.compatibilityScore.toLocaleString("ar-SA")}%
+                              </p>
+                            ) : null}
+                            {request.introduction ? (
+                              <p className="mt-2 max-w-xl text-sm font-bold leading-6 text-stone-600">
+                                {request.introduction}
+                              </p>
+                            ) : null}
+                            {(request.matchReasons?.length ?? 0) > 0 ? (
+                              <p className="mt-2 text-xs font-bold text-mintdeep">
+                                متوافق: {request.matchReasons?.slice(0, 4).join("، ")}
+                              </p>
+                            ) : null}
+                            {(request.differenceReasons?.length ?? 0) > 0 ? (
+                              <p className="mt-1 text-xs font-bold text-amber-700">
+                                مختلف: {request.differenceReasons?.slice(0, 4).join("، ")}
+                              </p>
+                            ) : null}
                           </div>
                           {request.status === "pending" ? (
                             <div className="flex gap-2">
@@ -448,10 +522,13 @@ export default function UserDashboardPage({
         </div>
 
         <div className="grid gap-5">
-          <div className="rounded-3xl border border-stone-200 bg-white p-5 text-right shadow-sm">
-            <SectionTitle title="طلبات الانضمام التي أرسلتيها" />
+          <div
+            id="user-join-requests"
+            className="rounded-3xl border border-stone-200 bg-white p-5 text-right shadow-sm"
+          >
+            <SectionTitle title="بطاقات شريكات السكن التي سجلتِ اهتمامك بها" />
             {activity.sentJoinRequests.length === 0 ? (
-              <EmptyState text="لم ترسلي طلب انضمام لشريكة سكن بعد." />
+              <EmptyState text="لم تسجلي اهتمامك بأي بطاقة شريكة سكن بعد." />
             ) : (
               <div className="mt-4 grid gap-3">
                 {activity.sentJoinRequests.map((item) => (
@@ -462,26 +539,27 @@ export default function UserDashboardPage({
                     type="button"
                   >
                     <p className="font-black text-ink">
-                      {item.property
-                        ? `${item.property.city}، ${item.property.neighborhood}`
-                        : "طلب شريكة سكن"}
+                      {item.roommateRequest?.requesterName || "بطاقة شريكة سكن"}
                     </p>
                     <p className="mt-1 text-sm font-bold text-stone-600">
-                      الحالة: {statusLabel(item.joinRequest.status)}
+                      {item.property
+                        ? `${item.property.city}، ${item.property.neighborhood}`
+                        : "معلومات الموقع غير متاحة"}
+                    </p>
+                    <p className="mt-2 text-xs font-black text-mintdeep">
+                      تم إرسال اهتمامك لصاحبة البطاقة
                     </p>
                   </button>
                 ))}
               </div>
             )}
-            {acceptedSent > 0 ? (
-              <p className="mt-3 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-mintdeep">
-                لديك {acceptedSent.toLocaleString("ar-SA")} طلب مقبول.
-              </p>
-            ) : null}
           </div>
 
-          <div className="rounded-3xl border border-stone-200 bg-white p-5 text-right shadow-sm">
-            <SectionTitle title="آخر اهتمامات السكن" />
+          <div
+            id="user-interests"
+            className="rounded-3xl border border-stone-200 bg-white p-5 text-right shadow-sm"
+          >
+            <SectionTitle title="المفضلة والحجوزات" />
             {activity.interests.length === 0 && activity.favorites.length === 0 ? (
               <EmptyState text="لم تضيفي أي اهتمام أو مفضلة بعد." />
             ) : (

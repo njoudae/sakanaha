@@ -1,11 +1,13 @@
-import logo from "../assets/saknaha-logo.webp";
+import logo from "../assets/saknaha-logo.png";
 import type { ReactNode } from "react";
 
 interface FooterProps {
   onHome: () => void;
   onOwner: () => void;
-  onUser: () => void;
+  onHousing: () => void;
   onCities: () => void;
+  onRoommates: () => void;
+  onAbout: () => void;
   onFaq: () => void;
   onSupport: () => void;
 }
@@ -13,8 +15,10 @@ interface FooterProps {
 export default function Footer({
   onHome,
   onOwner,
-  onUser,
+  onHousing,
   onCities,
+  onRoommates,
+  onAbout,
   onFaq,
   onSupport,
 }: FooterProps) {
@@ -39,21 +43,21 @@ export default function Footer({
           </span>
         </div>
 
-        <FooterGroup title="البحث عن سكن">
+        <FooterGroup title="التنقل">
           <FooterButton onClick={onHome}>الرئيسية</FooterButton>
-          <FooterButton onClick={onCities}>تصفح المدن</FooterButton>
-          <FooterButton onClick={onUser}>أبحث عن سكن</FooterButton>
+          <FooterButton onClick={onCities}>البحث عن سكن</FooterButton>
+          <FooterButton onClick={onRoommates}>البحث عن شريكة سكن</FooterButton>
         </FooterGroup>
 
-        <FooterGroup title="لأصحاب السكن">
-          <FooterButton onClick={onOwner}>عرض وحدة سكنية</FooterButton>
-          <FooterButton onClick={onOwner}>إدارة السكن</FooterButton>
-          <FooterButton onClick={onSupport}>خدمة التصوير</FooterButton>
+        <FooterGroup title="المستفيدون">
+          <FooterButton onClick={onOwner}>مالك عقار</FooterButton>
+          <FooterButton onClick={onHousing}>باحثة عن سكن</FooterButton>
+          <FooterButton onClick={onRoommates}>شريكة سكن</FooterButton>
         </FooterGroup>
 
         <FooterGroup title="الدعم">
+          <FooterButton onClick={onAbout}>عن سكنها</FooterButton>
           <FooterButton onClick={onSupport}>تواصل معنا</FooterButton>
-          <FooterButton onClick={onSupport}>الإبلاغ عن مشكلة</FooterButton>
           <FooterButton onClick={onFaq}>الأسئلة الشائعة</FooterButton>
         </FooterGroup>
       </div>

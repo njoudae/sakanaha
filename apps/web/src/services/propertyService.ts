@@ -21,6 +21,8 @@ import {
   withNormalizedInventory,
 } from "./propertyAvailability";
 import { getPropertyFeatures } from "./propertyAmenities";
+import { getCurrentOwner, getCurrentUser, isAutomaticApprovalAccount } from "./userService";
+import { previewProperties, previewRoommateRequests } from "../data/previewListings";
 
 const PROPERTY_KEY = "saknaha.properties";
 const INTEREST_KEY = "saknaha.interests";
@@ -145,10 +147,11 @@ function normalizeService(service: ServiceNearby & { distance?: string }): Servi
 }
 
 export function getPublishedProperties(): Property[] {
-  return getProperties().filter(
+  const published = getProperties().filter(
     (property) =>
       property.status === "published" && (property.publicationStatus ?? "approved") === "approved",
   );
+  return published.length > 0 ? published : previewProperties;
 }
 
 export function getOwnerSubmittedPublishedProperties(): Property[] {
@@ -156,7 +159,11 @@ export function getOwnerSubmittedPublishedProperties(): Property[] {
 }
 
 export function getPropertyById(id: string): Property | null {
-  return getProperties().find((property) => property.id === id) ?? null;
+  return (
+    getProperties().find((property) => property.id === id) ??
+    previewProperties.find((property) => property.id === id) ??
+    null
+  );
 }
 
 export function getPublicPropertyById(id: string): Property | null {
@@ -180,7 +187,22 @@ export function getUserInterests(userId: string): Interest[] {
 
 export function saveProperty(property: Property): Property {
   const properties = getProperties();
-  const normalizedProperty = withNormalizedInventory(property);
+  const currentOwner = getCurrentOwner();
+  const shouldApproveImmediately =
+    property.publicationStatus === "pending_review" &&
+    currentOwner?.id === property.ownerId &&
+    isAutomaticApprovalAccount(currentOwner.phone);
+  const normalizedProperty = withNormalizedInventory(
+    shouldApproveImmediately
+      ? {
+          ...property,
+          status: "published",
+          publicationStatus: "approved",
+          rejectionReason: undefined,
+          reviewedAt: new Date().toISOString(),
+        }
+      : property,
+  );
   const nextProperty = normalizedProperty.id
     ? normalizedProperty
     : { ...normalizedProperty, id: makeId("property"), createdAt: new Date().toISOString() };
@@ -397,9 +419,10 @@ export function addRoommatePreference(
 }
 
 export function getRoommateRequests(): RoommateRequest[] {
-  return getAllRoommateRequests().filter(
+  const approved = getAllRoommateRequests().filter(
     (request) => (request.publicationStatus ?? "approved") === "approved",
   );
+  return approved.length > 0 ? approved : previewRoommateRequests;
 }
 
 export function getAllRoommateRequests(): RoommateRequest[] {
@@ -421,8 +444,16 @@ export function getRoommateRequestById(id: string): RoommateRequest | null {
 export function addRoommateRequest(
   input: Omit<RoommateRequest, "id" | "createdAt">,
 ): RoommateRequest {
+  const currentUser = getCurrentUser();
+  const shouldApproveImmediately =
+    input.publicationStatus === "pending_review" &&
+    currentUser?.id === input.userId &&
+    isAutomaticApprovalAccount(currentUser.phone);
   const request: RoommateRequest = {
     ...input,
+    publicationStatus: shouldApproveImmediately ? "approved" : input.publicationStatus,
+    rejectionReason: shouldApproveImmediately ? undefined : input.rejectionReason,
+    reviewedAt: shouldApproveImmediately ? new Date().toISOString() : input.reviewedAt,
     id: makeId("roommate-request"),
     createdAt: new Date().toISOString(),
   };
@@ -598,6 +629,14 @@ export function addRoommateJoinRequest(input: {
   requestId: string;
   requesterUserId: string;
   requesterName: string;
+  introduction?: string;
+  preferences?: RoommateJoinRequest["preferences"];
+  preferredNeighborhood?: string;
+  preferredPropertyType?: RoommateJoinRequest["preferredPropertyType"];
+  preferredMonthlyBudget?: number;
+  compatibilityScore?: number;
+  matchReasons?: string[];
+  differenceReasons?: string[];
 }): RoommateJoinRequest | null {
   const targetRequest = getRoommateRequestById(input.requestId);
   if (!targetRequest || targetRequest.userId === input.requesterUserId) return null;
@@ -614,6 +653,14 @@ export function addRoommateJoinRequest(input: {
     propertyId: targetRequest.propertyId,
     requesterUserId: input.requesterUserId,
     requesterName: input.requesterName,
+    introduction: input.introduction?.trim(),
+    preferences: input.preferences,
+    preferredNeighborhood: input.preferredNeighborhood?.trim(),
+    preferredPropertyType: input.preferredPropertyType,
+    preferredMonthlyBudget: input.preferredMonthlyBudget,
+    compatibilityScore: input.compatibilityScore,
+    matchReasons: input.matchReasons,
+    differenceReasons: input.differenceReasons,
     ownerUserId: targetRequest.userId,
     status: "pending",
     createdAt: now,
@@ -626,21 +673,44 @@ export function addRoommateJoinRequest(input: {
   return joinRequest;
 }
 
+export function hasRoommateJoinRequest(requestId: string, requesterUserId: string): boolean {
+  return readStorage<RoommateJoinRequest[]>(ROOMMATE_JOIN_REQUEST_KEY, []).some(
+    (request) => request.requestId === requestId && request.requesterUserId === requesterUserId,
+  );
+}
+
 export function updateRoommateJoinRequestStatus(
   id: string,
+  ownerUserId: string,
   status: RoommateJoinRequest["status"],
-): void {
+): boolean {
   const now = new Date().toISOString();
-  const next = readStorage<RoommateJoinRequest[]>(ROOMMATE_JOIN_REQUEST_KEY, []).map((request) =>
+  const saved = readStorage<RoommateJoinRequest[]>(ROOMMATE_JOIN_REQUEST_KEY, []);
+  const target = saved.find((request) => request.id === id);
+  if (!target || target.ownerUserId !== ownerUserId) return false;
+  const next = saved.map((request) =>
     request.id === id ? { ...request, status, updatedAt: now } : request,
   );
   writeStorage(ROOMMATE_JOIN_REQUEST_KEY, next);
+  return true;
 }
 
 export function getUserActivity(userId: string) {
-  const properties = getProperties();
+  const savedProperties = getProperties();
+  const properties = [
+    ...savedProperties,
+    ...previewProperties.filter(
+      (preview) => !savedProperties.some((property) => property.id === preview.id),
+    ),
+  ];
   const propertiesById = new Map(properties.map((property) => [property.id, property]));
-  const roommateRequests = getAllRoommateRequests();
+  const savedRoommateRequests = getAllRoommateRequests();
+  const roommateRequests = [
+    ...savedRoommateRequests,
+    ...previewRoommateRequests.filter(
+      (preview) => !savedRoommateRequests.some((request) => request.id === preview.id),
+    ),
+  ];
   const roommateRequestsById = new Map(roommateRequests.map((request) => [request.id, request]));
   const roommateViews = readStorage<RoommateRequestView[]>(ROOMMATE_VIEW_KEY, []);
   const propertyViews = readStorage<PropertyView[]>(PROPERTY_VIEW_KEY, []);

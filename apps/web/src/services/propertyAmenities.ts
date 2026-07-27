@@ -7,15 +7,20 @@ import type {
 
 export const propertyFeatureOptions: Array<{ value: PropertyFeature; label: string }> = [
   { value: "cleaning_worker", label: "عامل تنظيف" },
-  { value: "security_cameras", label: "كاميرات أمن" },
+  { value: "security_cameras", label: "كاميرات مراقبة" },
   { value: "elevator", label: "مصعد" },
+  { value: "self_check_in", label: "دخول ذاتي" },
 ];
 
 export const propertyFacilityOptions: Array<{ value: PropertyFacility; label: string }> = [
   { value: "mosque", label: "مسجد" },
-  { value: "grocery", label: "بقالة" },
-  { value: "supermarket", label: "سوبرماركت" },
-  { value: "malls", label: "مولات" },
+  { value: "food_supply", label: "تموينات غذائية" },
+  { value: "mall", label: "مول" },
+  { value: "salon", label: "صالون" },
+  { value: "bus_station", label: "محطة باصات" },
+  { value: "train_station", label: "محطة قطار" },
+  { value: "pharmacy", label: "صيدلية" },
+  { value: "clinics", label: "عيادات" },
 ];
 
 export const rentIncludedOptions: Array<{ value: RentIncludedUtility; label: string }> = [

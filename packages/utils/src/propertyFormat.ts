@@ -20,16 +20,26 @@ export const rentalPeriodLabels: Record<RentalPeriod, string> = {
   daily: "يومي",
   weekly: "أسبوعي",
   monthly: "شهري",
+  term: "ترم",
+  academic_year: "سنة دراسية",
   yearly: "سنوي",
 };
 
-export const rentalPeriodOrder: readonly RentalPeriod[] = ["daily", "weekly", "monthly", "yearly"];
+export const rentalPeriodOrder: readonly RentalPeriod[] = [
+  "daily",
+  "weekly",
+  "monthly",
+  "term",
+  "academic_year",
+  "yearly",
+];
 
 export function rentalPeriodFromPaymentType(paymentType: PaymentType): RentalPeriod {
   return paymentType === "سنوي" ? "yearly" : "monthly";
 }
 
 export function paymentTypeFromRentalPeriod(period: RentalPeriod): PaymentType {
+  if (period === "term" || period === "academic_year") return "سنة دراسية";
   return period === "yearly" ? "سنوي" : "شهري";
 }
 

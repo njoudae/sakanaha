@@ -55,32 +55,27 @@ export default function RoommatesPage({
         الرجوع للصفحة الرئيسية
       </button>
 
-      <header className="mb-7 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+      <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="text-right">
           <p className="text-sm font-black uppercase tracking-wide text-berry">شريكات السكن</p>
-          <h1 className="mt-2 text-3xl font-black text-ink md:text-4xl">
-            سيدات قمن باستئجار سكن وبحاجة لشريكات سكن
-          </h1>
+          <h1 className="mt-1 text-2xl font-black text-ink md:text-3xl">باحثات عن شريكات سكن</h1>
         </div>
 
-        <div className="rounded-2xl border border-stone-200 bg-white/90 p-4 text-right shadow-sm">
-          <p className="mb-3 text-sm font-black text-ink">فلتر المدينة</p>
-          <label>
-            <span className="label">المدينة</span>
-            <select
-              className="field field-select"
-              value={city}
-              onChange={(event) => setCity(event.target.value)}
-            >
-              <option value="all">كل المدن</option>
-              {cityNames.map((cityName) => (
-                <option key={cityName} value={cityName}>
-                  {cityName}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <label className="flex min-w-0 items-center gap-2 border border-stone-200 bg-white px-3 py-2 text-right shadow-sm sm:w-64">
+          <span className="shrink-0 text-xs font-extrabold text-stone-600">المدينة</span>
+          <select
+            className="min-h-9 min-w-0 flex-1 bg-transparent text-sm font-extrabold text-ink outline-none"
+            value={city}
+            onChange={(event) => setCity(event.target.value)}
+          >
+            <option value="all">كل المدن</option>
+            {cityNames.map((cityName) => (
+              <option key={cityName} value={cityName}>
+                {cityName}
+              </option>
+            ))}
+          </select>
+        </label>
       </header>
 
       {listings.length === 0 ? (

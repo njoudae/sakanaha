@@ -1,15 +1,15 @@
 import { ChevronDown, Phone, UserCircle } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
-import { cityNames } from "@saknaha/constants/cities";
-import logo from "../assets/saknaha-logo.webp";
+import logo from "../assets/saknaha-logo.png";
 
 interface AppBarProps {
   onHome: () => void;
   onProfile: () => void;
+  onOwner: () => void;
+  onHousing: () => void;
+  onRoommates: () => void;
   onLogout?: () => void;
   accountName?: string;
-  onCities: () => void;
-  onCity: (city: string) => void;
   onAbout: () => void;
   onFaq: () => void;
   onSupport: () => void;
@@ -18,15 +18,15 @@ interface AppBarProps {
 export default function AppBar({
   onHome,
   onProfile,
+  onOwner,
+  onHousing,
+  onRoommates,
   onLogout,
   accountName,
-  onCities,
-  onCity,
   onAbout,
   onFaq,
   onSupport,
 }: AppBarProps) {
-  const featuredCities = cityNames.slice(0, 12);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuCloseTimer = useRef<number | null>(null);
 
@@ -79,26 +79,22 @@ export default function AppBar({
         <nav className="hidden items-center gap-1 text-sm font-black text-stone-600 lg:flex">
           <NavButton onClick={onHome}>الرئيسية</NavButton>
 
-          <Dropdown label="المدن">
-            <div className="grid min-w-72 grid-cols-2 gap-1">
-              {featuredCities.map((city) => (
-                <button
-                  key={city}
-                  className="rounded-lg px-3 py-2 text-right text-sm font-bold text-stone-600 transition hover:bg-linen hover:text-berry"
-                  onClick={() => onCity(city)}
-                  type="button"
-                >
-                  {city}
-                </button>
-              ))}
-            </div>
-            <button
-              className="mt-2 w-full rounded-lg border-t border-stone-100 px-3 py-2 text-right text-sm font-black text-berry transition hover:bg-linen"
-              onClick={onCities}
-              type="button"
-            >
-              تصفح كل المدن
-            </button>
+          <Dropdown label="المستفيدون">
+            <DropdownButton
+              onClick={onOwner}
+              title="مالك عقار"
+              description="الدخول إلى لوحة المالك وإدارة الإعلانات."
+            />
+            <DropdownButton
+              onClick={onHousing}
+              title="باحثة عن سكن"
+              description="عرض الصفحة الشاملة لجميع خيارات السكن."
+            />
+            <DropdownButton
+              onClick={onRoommates}
+              title="شريكة سكن"
+              description="عرض بطاقات الباحثات عن شريكات سكن."
+            />
           </Dropdown>
 
           <Dropdown label="من نحن">
@@ -108,21 +104,27 @@ export default function AppBar({
               description="تعرفي على المنصة وما نبنيه للسكن النسائي في السعودية."
             />
             <DropdownButton
+              onClick={onFaq}
+              title="الأسئلة الشائعة"
+              description="إجابات خطوات الاستخدام والرسوم."
+            />
+            <DropdownButton
               onClick={onSupport}
-              title="تواصلي مع الدعم"
+              title="الدعم"
               description="قنوات المساعدة وخيارات الدعم."
             />
-            <div className="mt-1 flex items-center justify-between gap-3 rounded-xl bg-linen px-3 py-2 text-sm font-black text-ink">
+            <button
+              className="mt-1 flex w-full items-center justify-between gap-3 rounded-xl bg-linen px-3 py-2 text-sm font-black text-ink transition hover:bg-stone-100"
+              onClick={onSupport}
+              type="button"
+            >
               <span className="inline-flex items-center gap-2">
                 <Phone size={16} aria-hidden="true" />
-                رقم التواصل
+                تواصل
               </span>
-              <span className="rounded-full bg-white px-3 py-1 text-xs text-berry">قريباً</span>
-            </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs text-berry">الدعم</span>
+            </button>
           </Dropdown>
-
-          <NavButton onClick={onFaq}>الأسئلة الشائعة</NavButton>
-          {!accountName ? <NavButton onClick={onProfile}>تسجيل الدخول</NavButton> : null}
         </nav>
 
         {accountName ? (
@@ -172,19 +174,47 @@ export default function AppBar({
             type="button"
           >
             <UserCircle size={24} aria-hidden="true" />
+            <span className="hidden text-sm font-extrabold text-ink sm:inline">تسجيل الدخول</span>
           </button>
         )}
       </div>
 
-      <nav className="mx-auto grid w-full max-w-7xl grid-cols-3 gap-2 px-4 pb-2 text-xs font-black text-stone-600 sm:grid-cols-6 md:px-8 lg:hidden">
-        <MobileButton onClick={onHome}>الرئيسية</MobileButton>
-        <MobileButton onClick={onCities}>المدن</MobileButton>
-        <MobileButton onClick={onProfile}>{accountName ? "لوحتي" : "الحساب"}</MobileButton>
-        <MobileButton onClick={onAbout}>من نحن</MobileButton>
-        <MobileButton onClick={onFaq}>الأسئلة</MobileButton>
-        <MobileButton onClick={onProfile}>
-          {accountName ? accountName : "تسجيل الدخول"}
-        </MobileButton>
+      <nav className="mx-auto flex w-full max-w-7xl items-center justify-center gap-1 px-4 pb-2 text-xs font-black text-stone-600 md:px-8 lg:hidden">
+        <NavButton onClick={onHome}>الرئيسية</NavButton>
+        <Dropdown label="المستفيدون">
+          <DropdownButton
+            onClick={onOwner}
+            title="مالك عقار"
+            description="الدخول إلى لوحة المالك وإدارة الإعلانات."
+          />
+          <DropdownButton
+            onClick={onHousing}
+            title="باحثة عن سكن"
+            description="عرض الصفحة الشاملة لجميع خيارات السكن."
+          />
+          <DropdownButton
+            onClick={onRoommates}
+            title="شريكة سكن"
+            description="عرض بطاقات الباحثات عن شريكات سكن."
+          />
+        </Dropdown>
+        <Dropdown label="من نحن">
+          <DropdownButton
+            onClick={onAbout}
+            title="عن سكنها"
+            description="تعرفي على المنصة وما نبنيه للسكن النسائي في السعودية."
+          />
+          <DropdownButton
+            onClick={onFaq}
+            title="الأسئلة الشائعة"
+            description="إجابات خطوات الاستخدام والرسوم."
+          />
+          <DropdownButton
+            onClick={onSupport}
+            title="الدعم والتواصل"
+            description="قنوات المساعدة وخيارات الدعم."
+          />
+        </Dropdown>
       </nav>
     </header>
   );
@@ -194,18 +224,6 @@ function NavButton({ children, onClick }: { children: string; onClick: () => voi
   return (
     <button
       className="rounded-xl px-3 py-2 transition hover:bg-linen hover:text-ink"
-      onClick={onClick}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
-
-function MobileButton({ children, onClick }: { children: string; onClick: () => void }) {
-  return (
-    <button
-      className="min-h-9 rounded-full border border-stone-200 bg-white/80 px-2 py-1.5 transition hover:border-berry hover:text-berry"
       onClick={onClick}
       type="button"
     >

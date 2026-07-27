@@ -141,7 +141,7 @@ function ConvexAuthServiceBridge({
   const markNotificationUnread = useMutation(api.notifications.markUnread);
   const markAllNotificationsRead = useMutation(api.notifications.markAllRead);
 
-  const mediaService = useMemo(
+  const convexMediaService = useMemo(
     () =>
       createConvexMediaService({
         createUpload: createMediaUpload,
@@ -164,6 +164,8 @@ function ConvexAuthServiceBridge({
       finalizeVideoUpload,
     ],
   );
+  const mediaService =
+    authState.isAuthenticated && currentProfile ? convexMediaService : browserMediaService;
 
   const adminData = useMemo<AdminDataValue>(
     () => ({

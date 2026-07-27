@@ -14,17 +14,37 @@ export type PropertyType = "شقة" | "دور" | "غرفة" | "عمارة" | "س
 export type PropertyClassification =
   "نسائي بالكامل" | "عوائل" | "دور نسائي داخل سكن عوائل" | "متاح للجميع";
 export type PaymentType = "شهري" | "سنوي" | "سنة دراسية";
-export type RentalPeriod = "daily" | "weekly" | "monthly" | "yearly";
+export type RentalPeriod = "daily" | "weekly" | "monthly" | "term" | "academic_year" | "yearly";
 export type RentalPrices = Partial<Record<RentalPeriod, number>>;
 export type AvailabilityStatus = "available" | "nearly_full" | "full";
-export type PropertyFeature = "cleaning_worker" | "security_cameras" | "elevator";
-export type PropertyFacility = "mosque" | "grocery" | "supermarket" | "malls";
+export type PropertyFeature = "cleaning_worker" | "security_cameras" | "elevator" | "self_check_in";
+export type PropertyFacility =
+  | "mosque"
+  | "food_supply"
+  | "mall"
+  | "salon"
+  | "bus_station"
+  | "train_station"
+  | "pharmacy"
+  | "clinics";
 export type RentIncludedUtility = "electricity" | "water" | "internet";
+export type RoommateCardSource = "saknaha_property" | "external_property";
+export interface RoommateLifestylePreferences {
+  smoking: "yes" | "no";
+  guests: "never" | "occasionally" | "frequently" | "no_preference";
+  sleep: "early" | "flexible" | "late";
+  cleanliness: "very_tidy" | "average" | "no_preference";
+  pets: "allowed" | "not_allowed";
+  cooking: "frequently" | "occasionally" | "rarely";
+  occupation: "student" | "employee" | "both";
+  noise: "quiet" | "moderate" | "no_preference";
+}
 export type ServiceType = "بقالة" | "مطعم" | "مغسلة" | "صيدلية" | "مواصلات" | "جامعة" | "غير ذلك";
 export type DistanceUnit = "meter" | "kilometer" | "walking_minutes" | "driving_minutes" | "hour";
 
 export interface Owner {
   id: string;
+  publicCode?: string;
   fullName: string;
   email?: string;
   phone: string;
@@ -36,6 +56,7 @@ export interface Owner {
 
 export interface User {
   id: string;
+  publicCode?: string;
   name: string;
   email?: string;
   phone: string;
@@ -44,6 +65,7 @@ export interface User {
   city: string;
   monthlyBudget: number;
   acceptsRoommate: boolean;
+  roommatePreferences?: RoommateLifestylePreferences;
   selectedUniversityBranchId?: string;
   createdAt: string;
 }
@@ -160,6 +182,9 @@ export interface RoommateRequest {
   moveInDate: string;
   bio: string;
   availableRooms: number;
+  source?: RoommateCardSource;
+  pricePerPerson?: number;
+  preferences?: RoommateLifestylePreferences;
   region?: string;
   city?: string;
   district?: string;
@@ -194,6 +219,14 @@ export interface RoommateJoinRequest {
   propertyId: string;
   requesterUserId: string;
   requesterName: string;
+  introduction?: string;
+  preferences?: RoommateLifestylePreferences;
+  preferredNeighborhood?: string;
+  preferredPropertyType?: PropertyType;
+  preferredMonthlyBudget?: number;
+  compatibilityScore?: number;
+  matchReasons?: string[];
+  differenceReasons?: string[];
   ownerUserId: string;
   status: "pending" | "accepted" | "rejected";
   createdAt: string;

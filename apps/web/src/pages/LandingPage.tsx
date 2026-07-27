@@ -8,12 +8,14 @@ import {
 } from "../services/propertyService";
 import type { Property, RoommateRequest } from "@saknaha/shared-types";
 import { useState } from "react";
-import { SlidersHorizontal, X } from "lucide-react";
-import { regionForCity, saudiRegions } from "@saknaha/constants/locations";
+import { SlidersHorizontal } from "lucide-react";
+import { cityNames } from "@saknaha/constants/cities";
+import FaqAccordion from "../components/FaqAccordion";
 
 interface LandingPageProps {
   onUser: () => void;
   onHousing: () => void;
+  onProperty: (propertyId: string) => void;
   onCity: (city: string) => void;
   onRoommates: () => void;
   onRoommateDetails: (requestId: string) => void;
@@ -24,40 +26,18 @@ interface RoommateListing {
   property: Property;
 }
 
-const faqItems = [
-  {
-    question: "كيف أستخدم سكنها كمالك عقار؟",
-    answer:
-      "بعد الضغط على تسجيل الدخول اختاري خيار مالك/ة عقار، ثم سجلي الدخول أو أنشئي حساباً جديداً. بعد ذلك ستظهر لك لوحة التحكم الخاصة بك، ومن خلالها يمكنك إضافة العقارات، تعديل بياناتها، رفع صور واضحة، ومراجعة صفحة المعاينة قبل نشر السكن للباحثات.",
-  },
-  {
-    question: "كيف أبحث عن سكن مناسب؟",
-    answer:
-      "ادخلي إلى صفحة خيارات السكن المتاحة وحددي المنطقة المناسبة لك. ستظهر لك كافة العقارات المضافة حتى الآن، ويمكنك مشاهدة الصور ومقاطع الفيديو، ومراجعة المميزات مثل توفر الخدمات، ومدى قرب السكن من الجامعة أو مقر العمل، ثم اختيار السكن المناسب واستئجاره.",
-  },
-  {
-    question: "أنا حاجزة سكن وأحتاج شريكات، كيف أضيف طلبي؟",
-    answer:
-      "إذا قمتِ بحجز سكن من خيارات السكن المتاحة على المنصة، فبعد الحجز سيظهر لك خيار البحث عن شريكة سكن. عند إدخال البيانات ستظهر بطاقتك في صفحة البحث عن شريكة سكن. وإذا كنتِ مستأجرة سكناً خارج المنصة، فمن لوحة التحكم الخاصة بك اختاري البحث عن شريكة سكن، ثم عبئي البيانات وستظهر البطاقة برسوم قدرها 30 ريال.",
-  },
-  {
-    question: "هل بطاقة شريكة السكن مرتبطة فعلياً بالعقار؟",
-    answer:
-      "إذا كانت البطاقة مرتبطة بعقار موجود على المنصة، فيمكنك فتح العقار ومشاهدة تفاصيله وصوره ومميزاته. أما إذا لم تكن مرتبطة بعقار موجود على المنصة، فتواصلي مع المعلنة مباشرة لمناقشة تفاصيل السكن والترتيبات المناسبة.",
-  },
-];
-
 export default function LandingPage({
   onHousing,
+  onProperty,
   onRoommates,
   onRoommateDetails,
 }: LandingPageProps) {
   const [activeSection, setActiveSection] = useState<"all" | "housing" | "roommates">("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [selectedRegion, setSelectedRegion] = useState("");
+  const [selectedCity, setSelectedCity] = useState("all");
   const matchesLocation = (property: Property) => {
-    if (!selectedRegion) return true;
-    return (property.region || regionForCity(property.city)) === selectedRegion;
+    if (selectedCity === "all") return true;
+    return property.city === selectedCity;
   };
   const housing = getPublishedProperties().filter(matchesLocation).slice(0, 10);
   const roommates = getRoommateRequests()
@@ -68,7 +48,7 @@ export default function LandingPage({
     .filter((listing): listing is RoommateListing =>
       Boolean(listing && matchesLocation(listing.property)),
     );
-  const hasLocationFilter = Boolean(selectedRegion);
+  const hasLocationFilter = selectedCity !== "all";
 
   return (
     <main className="overflow-x-hidden" dir="rtl">
@@ -82,7 +62,7 @@ export default function LandingPage({
         <div className="mx-4 flex min-h-10 items-stretch gap-1.5 md:relative md:mx-8 md:justify-center">
           <button
             type="button"
-            className={`relative inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-black shadow-sm transition sm:px-3 md:absolute md:right-0 md:top-0 ${
+            className={`relative order-2 inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-black shadow-sm transition sm:px-3 md:absolute md:left-0 md:top-0 ${
               filtersOpen || hasLocationFilter
                 ? "border-berry bg-white text-berry"
                 : "border-stone-200 bg-white text-ink hover:border-berry hover:text-berry"
@@ -103,12 +83,12 @@ export default function LandingPage({
           </button>
 
           <nav
-            className="grid min-w-0 flex-1 grid-cols-3 gap-1 rounded-lg bg-linen p-1 md:w-full md:max-w-lg md:flex-none"
+            className="order-1 grid min-w-0 flex-1 grid-cols-3 gap-1 rounded-lg bg-linen p-1 md:w-full md:max-w-lg md:flex-none"
             aria-label="أقسام الصفحة الرئيسية"
           >
             {[
               { value: "all", label: "الكل" },
-              { value: "housing", label: "السكن" },
+              { value: "housing", label: "خيارات السكن" },
               { value: "roommates", label: "شريكات السكن" },
             ].map((item) => (
               <button
@@ -129,51 +109,45 @@ export default function LandingPage({
         </div>
 
         {filtersOpen ? (
-          <section
+          <div
             id="landing-location-filters"
-            className="mx-4 mt-2 grid gap-2 rounded-lg border border-stone-200 bg-white p-3 shadow-sm sm:grid-cols-[1fr_auto] md:mx-8 md:max-w-xl"
-            aria-label="تصفية حسب المنطقة"
+            className="mx-4 mt-2 flex justify-end md:mx-8"
+            aria-label="تصفية حسب المدينة"
           >
-            <label className="grid gap-1.5 text-sm font-black text-ink">
-              المنطقة
+            <label className="flex w-full min-w-0 items-center gap-2 border border-stone-200 bg-white px-3 py-2 text-right shadow-sm sm:w-64">
+              <span className="flex shrink-0 items-center gap-1.5 text-xs font-extrabold text-stone-600">
+                <SlidersHorizontal size={17} aria-hidden="true" />
+                المدينة
+              </span>
               <select
-                className="min-h-10 rounded-lg border border-stone-200 bg-white px-3 text-sm font-bold outline-none focus:border-berry"
-                value={selectedRegion}
-                onChange={(event) => setSelectedRegion(event.target.value)}
+                className="min-h-9 min-w-0 flex-1 bg-transparent text-sm font-extrabold text-ink outline-none"
+                value={selectedCity}
+                onChange={(event) => setSelectedCity(event.target.value)}
               >
-                <option value="">كل المناطق</option>
-                {saudiRegions.map((region) => (
-                  <option key={region.name} value={region.name}>
-                    {region.name}
+                <option value="all">كل المدن</option>
+                {cityNames.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
                   </option>
                 ))}
               </select>
             </label>
-
-            <button
-              type="button"
-              className="secondary-button self-end"
-              disabled={!hasLocationFilter}
-              onClick={() => setSelectedRegion("")}
-            >
-              <X size={17} aria-hidden="true" />
-              مسح
-            </button>
-          </section>
+          </div>
         ) : null}
 
         {activeSection !== "roommates" ? (
           <DiscoveryCarousel
-            title="خيارات السكن"
+            title="جميع خيارات السكن"
             items={housing}
             onTitleClick={onHousing}
-            railClassName="lg:relative lg:-left-8"
+            itemClassName="h-[520px] w-[88vw] max-w-[390px] shrink-0 snap-start sm:w-[360px]"
             renderItem={(property) => (
               <PropertyCard
                 property={property}
                 compact
-                onView={onHousing}
-                actionLabel="تصفح خيارات السكن"
+                featured
+                onView={() => onProperty(property.id)}
+                actionLabel="عرض تفاصيل السكن"
               />
             )}
             emptyText="لا توجد عقارات منشورة حالياً."
@@ -182,11 +156,12 @@ export default function LandingPage({
 
         {activeSection !== "housing" ? (
           <DiscoveryCarousel
-            title="خيارات شريكات السكن"
+            title="شريكات السكن"
             items={roommates}
             onTitleClick={onRoommates}
+            itemClassName="w-[84vw] max-w-[360px] shrink-0 snap-start"
             renderItem={(listing) => (
-              <RoommateListingCard listing={listing} onDetails={onRoommateDetails} />
+              <RoommateListingCard listing={listing} onDetails={onRoommateDetails} featured />
             )}
             emptyText="لا توجد فرص شريكة سكن حالياً."
           />
@@ -205,24 +180,8 @@ export default function LandingPage({
           <h2 className="mb-6 text-center text-2xl font-black text-ink md:text-3xl">
             الأسئلة الشائعة عن خدمات سكنها
           </h2>
-          <div className="mx-auto grid max-w-6xl gap-3">
-            {faqItems.map((item) => (
-              <details
-                key={item.question}
-                className="group rounded-2xl border border-stone-200 bg-white shadow-sm"
-              >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-right text-base font-black text-ink marker:hidden md:text-lg">
-                  <span>{item.question}</span>
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-stone-500">
-                    <span className="text-2xl leading-none group-open:hidden">+</span>
-                    <span className="hidden text-xl leading-none group-open:block">×</span>
-                  </span>
-                </summary>
-                <p className="border-t border-stone-100 px-5 pb-5 pt-4 text-sm font-bold leading-7 text-stone-600 md:text-base">
-                  {item.answer}
-                </p>
-              </details>
-            ))}
+          <div className="mx-auto max-w-6xl">
+            <FaqAccordion initiallyOpen={-1} />
           </div>
         </section>
       </div>

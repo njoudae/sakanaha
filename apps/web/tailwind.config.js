@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["IBM Plex Sans Arabic", "Noto Sans Arabic", "Segoe UI", "Arial", "sans-serif"],
+        sans: ["Tajawal", "Segoe UI", "Arial", "sans-serif"],
       },
       colors: {
         ink: "#1f2937",

@@ -24,13 +24,18 @@ export default function OwnerDashboardPage({
   const interests = getOwnerInterests(owner.id);
 
   return (
-    <main className="page-shell" dir="rtl">
+    <main className="page-shell" dir="rtl" id="owner-dashboard-overview">
       <header className="mb-6 rounded-2xl border border-white/70 bg-white/85 p-4 text-right shadow-soft md:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-black text-mintdeep">لوحة صاحب السكن</p>
-            <h1 className="mt-1 text-3xl font-black text-ink">مرحباً {owner.fullName}</h1>
+            <h1 className="mt-1 text-2xl font-black text-ink">مرحباً {owner.fullName}</h1>
             <p className="mt-2 text-sm font-bold text-stone-600">رقم الجوال: {owner.phone}</p>
+            {owner.publicCode ? (
+              <p className="mt-1 text-xs font-black text-berry" dir="ltr">
+                رقم المستخدم: {owner.publicCode}
+              </p>
+            ) : null}
           </div>
           <div className="flex">
             <button className="danger-button" onClick={onLogout}>

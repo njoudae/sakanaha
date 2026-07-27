@@ -1,9 +1,18 @@
-import { ArrowRight, Camera, ChevronDown, Loader2, MapPinned, Trash2, Video } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import {
+  ArrowRight,
+  Camera,
+  ChevronDown,
+  Loader2,
+  MapPinned,
+  Plus,
+  Trash2,
+  Video,
+} from "lucide-react";
+import { useState, type FormEvent } from "react";
 import Stepper from "../components/Stepper";
 import PropertyLocationPicker from "../components/PropertyLocationPicker";
-import { saveProperty } from "../services/propertyService";
-import { citiesForRegion, regionForCity, saudiRegions } from "@saknaha/constants/locations";
+import { cityNames } from "@saknaha/constants/cities";
+import { regionForCity } from "@saknaha/constants/locations";
 import type {
   Owner,
   Property,
@@ -24,11 +33,7 @@ import {
   rentalPeriodLabels,
   rentalPeriodOrder,
 } from "@saknaha/utils/propertyFormat";
-import {
-  isLikelySaudiCoordinate,
-  isValidCoordinates,
-  parseGoogleMapsLocationUrl,
-} from "@saknaha/utils/directions";
+import { isValidCoordinates, parseGoogleMapsLocationUrl } from "@saknaha/utils/directions";
 import { useMediaService } from "../media/MediaServiceContext";
 import type { MediaUploadProgress } from "../media/MediaService";
 import { useMapsData } from "../data/MapsDataContext";
@@ -38,6 +43,7 @@ import {
   propertyFeatureOptions,
   rentIncludedOptions,
 } from "../services/propertyAmenities";
+import { saveProperty } from "../services/propertyService";
 
 const steps = ["الموقع", "معلومات السكن", "السعر والصور", "المراجعة والنشر"];
 
@@ -64,7 +70,6 @@ interface AddPropertyPageProps {
 
 export default function AddPropertyPage({ owner, editing, onSaved, onBack }: AddPropertyPageProps) {
   const mediaService = useMediaService();
-  const mapsData = useMapsData();
   const [step, setStep] = useState(0);
   const [property, setProperty] = useState<Property>(
     () =>
@@ -85,9 +90,9 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
         googleMapsUrl: "",
         classification: "نسائي بالكامل",
         propertyType: "عمارة",
-        minRooms: 1,
-        maxRooms: 3,
-        floorsCount: 1,
+        minRooms: 0,
+        maxRooms: 0,
+        floorsCount: 0,
         hasElevator: false,
         hasCleaningWorker: false,
         features: [],
@@ -95,17 +100,17 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
         rentIncludes: [],
         hasTransportService: false,
         universityBusPasses: false,
-        bathrooms: 1,
+        bathrooms: 0,
         furnished: true,
-        maxResidents: 3,
-        totalUnits: 3,
-        availableUnits: 3,
+        maxResidents: 0,
+        totalUnits: 0,
+        availableUnits: 0,
         availabilityStatus: "available",
         roommateAllowed: true,
         requiresLeaseContract: true,
-        price: 2000,
+        price: 0,
         paymentType: "شهري",
-        rentalPrices: { monthly: 2000 },
+        rentalPrices: {},
         negotiable: true,
         allowWhatsappContact: true,
         deposit: 0,
@@ -120,64 +125,49 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
         createdAt: new Date().toISOString(),
       },
   );
+  const [primaryRentalPeriod, setPrimaryRentalPeriod] = useState<RentalPeriod>(() => {
+    if (!editing) return "monthly";
+    const prices = editing.rentalPrices ?? normalizeRentalPrices(editing);
+    return (
+      rentalPeriodOrder.find(
+        (period) =>
+          prices[period] === editing.price &&
+          paymentTypeFromRentalPeriod(period) === editing.paymentType,
+      ) ??
+      rentalPeriodOrder.find((period) => typeof prices[period] === "number") ??
+      "monthly"
+    );
+  });
   const [uploadProgress, setUploadProgress] = useState<Record<string, MediaUploadProgress>>({});
   const [mediaError, setMediaError] = useState("");
   const isUploading = Object.keys(uploadProgress).length > 0;
 
-  const canGoNext = useMemo(() => {
-    if (step === 0) {
-      return Boolean(
-        property.region?.trim() &&
-        property.city.trim() &&
-        property.neighborhood.trim() &&
-        property.classification &&
-        isValidCoordinates(
-          property.lat !== undefined && property.lng !== undefined
-            ? { lat: property.lat, lng: property.lng }
-            : null,
-        ),
-      );
-    }
-    if (step === 1) {
-      return (
-        property.propertyType &&
-        property.maxResidents > 0 &&
-        property.minRooms > 0 &&
-        property.maxRooms >= property.minRooms
-      );
-    }
-    if (step === 2) {
-      const prices = property.rentalPrices ?? normalizeRentalPrices(property);
-      const selectedPrices = Object.values(prices);
-      return (
-        selectedPrices.length > 0 &&
-        selectedPrices.every((price) => typeof price === "number" && price > 0) &&
-        property.images.length > 0 &&
-        !isUploading
-      );
-    }
-    return true;
-  }, [isUploading, property, step]);
+  const canGoNext = !isUploading;
 
   function update<K extends keyof Property>(key: K, value: Property[K]) {
     setProperty((current) => ({ ...current, [key]: value }));
   }
 
-  function updateRentalPrices(nextPrices: RentalPrices) {
-    setProperty((current) => {
-      const primary = rentalPeriodOrder
-        .map((period) => ({ period, price: nextPrices[period] }))
-        .find(
-          (entry): entry is { period: RentalPeriod; price: number } =>
-            typeof entry.price === "number" && entry.price > 0,
-        );
-      return {
-        ...current,
-        rentalPrices: nextPrices,
-        price: primary?.price ?? 0,
-        paymentType: primary ? paymentTypeFromRentalPeriod(primary.period) : current.paymentType,
-      };
-    });
+  function updateRentalPrices(
+    nextPrices: RentalPrices,
+    requestedPrimaryPeriod = primaryRentalPeriod,
+  ) {
+    const configuredPeriods = rentalPeriodOrder.filter((period) =>
+      Object.prototype.hasOwnProperty.call(nextPrices, period),
+    );
+    const selectedPrimaryPeriod = configuredPeriods.includes(requestedPrimaryPeriod)
+      ? requestedPrimaryPeriod
+      : configuredPeriods[0];
+    if (selectedPrimaryPeriod) setPrimaryRentalPeriod(selectedPrimaryPeriod);
+
+    setProperty((current) => ({
+      ...current,
+      rentalPrices: nextPrices,
+      price: selectedPrimaryPeriod ? (nextPrices[selectedPrimaryPeriod] ?? 0) : 0,
+      paymentType: selectedPrimaryPeriod
+        ? paymentTypeFromRentalPeriod(selectedPrimaryPeriod)
+        : current.paymentType,
+    }));
   }
 
   function stopFormSubmit(event: FormEvent) {
@@ -329,69 +319,23 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
     }
   }
 
-  async function publish(publicationStatus: "pending_review" | "draft") {
-    let location = {
-      googleMapsUrl: property.googleMapsUrl.trim(),
-      lat: property.lat,
-      lng: property.lng,
-      locationVisibility: property.locationVisibility,
-    };
-    if (location.googleMapsUrl) {
-      const parsed = await mapsData.resolveLocationLink(location.googleMapsUrl);
-      if (!parsed.ok) {
-        window.alert(googleMapsLinkError(parsed.reason));
-        return;
-      }
-      if (
-        !isLikelySaudiCoordinate(parsed.coordinates) &&
-        !window.confirm("الإحداثيات خارج النطاق المعتاد للسعودية. هل تريدين حفظها بعد التحقق منها؟")
-      ) {
-        return;
-      }
-      location = {
-        googleMapsUrl: parsed.normalizedUrl,
-        lat: parsed.coordinates.lat,
-        lng: parsed.coordinates.lng,
-        locationVisibility: location.locationVisibility ?? "exact",
-      };
-    }
-    const coordinatesVerified = isValidCoordinates(
-      location.lat !== undefined && location.lng !== undefined
-        ? { lat: location.lat, lng: location.lng }
-        : null,
-    );
-    if (
-      publicationStatus === "pending_review" &&
-      (!property.region?.trim() ||
-        !property.city.trim() ||
-        !property.neighborhood.trim() ||
-        !coordinatesVerified ||
-        property.images.length === 0)
-    ) {
-      window.alert("المنطقة والمدينة والحي والإحداثيات وصورة واحدة على الأقل مطلوبة.");
-      return;
-    }
-    saveProperty({
+  function publish(publicationStatus: "pending_review" | "draft") {
+    const submittedAt = new Date().toISOString();
+    const savedProperty = saveProperty({
       ...property,
-      ...location,
-      status: publicationStatus === "draft" ? "draft" : "pending_review",
+      status: publicationStatus,
       publicationStatus,
-      submittedAt:
-        publicationStatus === "pending_review" ? new Date().toISOString() : property.submittedAt,
+      paymentCompleted: publicationStatus === "pending_review",
+      submittedAt: publicationStatus === "pending_review" ? submittedAt : property.submittedAt,
       rejectionReason: undefined,
-      title: property.title || selectedClassificationLabel(property.classification),
-      address: property.address || `${property.city} - ${property.neighborhood}`,
-      propertyLicenseNumber: property.propertyLicenseNumber || "غير محدد",
-      universityNearby: property.universityNearby || "غير محدد",
-      distanceText: property.distanceText,
-      timeText: property.timeText,
-      ownerId: owner.id,
-      ownerName: owner.fullName,
-      ownerPhone: owner.phone,
     });
-    if (publicationStatus === "pending_review") {
-      window.alert("تم إرسال إعلانك لمراجعة الإدارة. الحالة الحالية: بانتظار المراجعة.");
-    }
+    window.alert(
+      publicationStatus === "draft"
+        ? "تم حفظ المسودة في نسخة الواجهات."
+        : savedProperty.publicationStatus === "approved"
+          ? "تمت الموافقة على العقار ونشره مباشرة. سيظهر الآن في الصفحة الرئيسية."
+          : "اكتملت معاينة الدفع بقيمة 150 ريال وتم إرسال العقار للمراجعة.",
+    );
     onSaved();
   }
 
@@ -407,7 +351,7 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
           <p className="text-sm font-black text-mintdeep">
             {editing ? "تعديل وحدة سكنية" : "إضافة سكن"}
           </p>
-          <h1 className="text-3xl font-black text-ink">بيانات السكن</h1>
+          <h1 className="text-2xl font-black text-ink">بيانات السكن</h1>
         </div>
 
         <Stepper steps={steps} currentStep={step} />
@@ -423,19 +367,20 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
               السابق
             </button>
             <div className="grid gap-2 sm:grid-cols-2">
-              <button
-                className="secondary-button"
-                onClick={() => void publish("draft")}
-                type="button"
-              >
-                حفظ كمسودة
+              <p className="sm:col-span-2 flex flex-wrap items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-black text-mintdeep">
+                <span>رسوم نشر الإعلان:</span>
+                <span className="text-stone-500 line-through decoration-2">300 ريال</span>
+                <span>150 ريال بعد الخصم</span>
+              </p>
+              <button className="secondary-button" onClick={() => publish("draft")} type="button">
+                معاينة المسودة
               </button>
               <button
                 className="primary-button"
-                onClick={() => void publish("pending_review")}
+                onClick={() => publish("pending_review")}
                 type="button"
               >
-                إرسال للمراجعة
+                الدفع وإرسال للمعاينة
               </button>
             </div>
           </div>
@@ -456,6 +401,7 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
               property={property}
               update={update}
               updateRentalPrices={updateRentalPrices}
+              primaryRentalPeriod={primaryRentalPeriod}
               uploadImages={uploadImages}
               uploadVideos={uploadVideos}
               uploadProgress={Object.entries(uploadProgress).map(([id, progress]) => ({
@@ -465,7 +411,9 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
               mediaError={mediaError}
             />
           ) : null}
-          {step === 3 ? <ReviewStep property={property} /> : null}
+          {step === 3 ? (
+            <ReviewStep property={property} primaryRentalPeriod={primaryRentalPeriod} />
+          ) : null}
         </form>
 
         {step < steps.length - 1 ? (
@@ -499,7 +447,10 @@ function LocationStep({ property, update }: { property: Property; update: Update
   const mapsData = useMapsData();
   const [mapsLinkError, setMapsLinkError] = useState("");
   const [resolvingLink, setResolvingLink] = useState(false);
-  const availableCities = citiesForRegion(property.region ?? "");
+  const [locationMethod, setLocationMethod] = useState<"current" | "link" | "map" | null>(
+    property.googleMapsUrl ? "link" : property.lat !== undefined ? "map" : null,
+  );
+  const [locationMessage, setLocationMessage] = useState("");
 
   async function validateMapsLink() {
     if (!property.googleMapsUrl.trim()) {
@@ -520,35 +471,55 @@ function LocationStep({ property, update }: { property: Property; update: Update
     if (!property.locationVisibility) update("locationVisibility", "exact");
   }
 
+  function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setLocationMessage("المتصفح لا يدعم تحديد الموقع الحالي.");
+      return;
+    }
+    setLocationMessage("جاري تحديد الموقع...");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        update("lat", coords.latitude);
+        update("lng", coords.longitude);
+        update(
+          "googleMapsUrl",
+          getGoogleMapsUrl(
+            { ...property, lat: coords.latitude, lng: coords.longitude },
+            { canViewExact: true },
+          ) ?? "",
+        );
+        setLocationMessage("تم تحديد الموقع الحالي والتحقق من الإحداثيات.");
+      },
+      () => setLocationMessage("تعذر الوصول إلى الموقع. تحققي من إذن الموقع ثم حاولي مجدداً."),
+      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 60_000 },
+    );
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <Select
-        label="المنطقة *"
-        value={property.region ?? ""}
-        options={[
-          { label: "اختاري المنطقة", value: "" },
-          ...saudiRegions.map((region) => ({ label: region.name, value: region.name })),
-        ]}
-        onChange={(value) => {
-          update("region", value);
-          const cities = citiesForRegion(value);
-          if (!cities.includes(property.city)) update("city", cities[0] ?? "");
-        }}
+      <Input
+        label="اسم السكن"
+        placeholder="مثال: عمارة روند"
+        value={property.title}
+        onChange={(value) => update("title", value)}
       />
       <Select
-        label="المدينة *"
+        label="المدينة"
         value={property.city}
         options={[
           { label: "اختاري المدينة", value: "" },
-          ...availableCities.map((city) => ({ label: city, value: city })),
+          ...cityNames.map((city) => ({ label: city, value: city })),
         ]}
         onChange={(value) => {
           update("city", value);
-          if (!property.region) update("region", regionForCity(value));
+          update("region", regionForCity(value));
         }}
       />
+      <p className="self-end pb-3 text-xs font-bold text-stone-500 md:col-span-1">
+        مثال: أبها، خميس مشيط، محايل، بيشة، النماص
+      </p>
       <Input
-        label="الحي *"
+        label="الحي"
         placeholder="مثال: النزهة"
         value={property.neighborhood}
         onChange={(value) => {
@@ -556,11 +527,9 @@ function LocationStep({ property, update }: { property: Property; update: Update
           update("district", value);
         }}
       />
-      <Input
-        label="معلم قريب (اختياري)"
-        placeholder="جامعة، مستشفى، شركة، مركز تسوق أو مسجد"
-        value={property.landmark ?? ""}
-        onChange={(value) => update("landmark", value)}
+      <LandmarksEditor
+        primaryLandmark={property.landmark ?? ""}
+        onPrimaryLandmark={(value) => update("landmark", value)}
       />
       <Select
         label="التصنيف"
@@ -575,41 +544,97 @@ function LocationStep({ property, update }: { property: Property; update: Update
         onChange={(value) => update("address", value)}
       />
       <Input
-        label="رقم رخصة السكن"
+        label="رقم ترخيص الإعلان"
         placeholder="اختياري"
         value={property.propertyLicenseNumber}
         onChange={(value) => update("propertyLicenseNumber", value)}
       />
-      <label className="md:col-span-2">
-        <span className="label">رابط Google Maps</span>
-        <div className="relative">
-          <input
-            className="field pr-12"
-            dir="ltr"
-            placeholder="https://maps.app.goo.gl/... أو https://www.google.com/maps/..."
-            value={property.googleMapsUrl}
-            onChange={(event) => {
-              setMapsLinkError("");
-              update("googleMapsUrl", event.target.value);
-            }}
-            onBlur={() => void validateMapsLink()}
-            aria-invalid={Boolean(mapsLinkError)}
-          />
-          <MapPinned
-            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-stone-500"
-            size={18}
-            aria-hidden="true"
-          />
+      <fieldset className="grid gap-3 rounded-xl border border-stone-200 bg-linen p-4 md:col-span-2 xl:col-span-3">
+        <legend className="px-2 text-sm font-black text-ink">اختاري طريقة تحديد الموقع</legend>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[
+            { value: "current", label: "الموقع الحالي" },
+            { value: "link", label: "رابط Google Maps" },
+            { value: "map", label: "تحديد على الخريطة" },
+          ].map((method) => (
+            <button
+              key={method.value}
+              className={locationMethod === method.value ? "primary-button" : "secondary-button"}
+              onClick={() => {
+                setLocationMethod(method.value as "current" | "link" | "map");
+                setLocationMessage("");
+              }}
+              type="button"
+            >
+              {method.label}
+            </button>
+          ))}
         </div>
-        {resolvingLink ? (
-          <p className="mt-2 text-sm font-bold text-stone-600">جاري التحقق من الرابط...</p>
+
+        {locationMethod === "current" ? (
+          <div>
+            <button className="secondary-button w-full" type="button" onClick={useCurrentLocation}>
+              <MapPinned size={18} aria-hidden="true" />
+              تحديد موقعي الآن
+            </button>
+            {locationMessage ? (
+              <p className="mt-2 text-sm font-bold text-stone-600">{locationMessage}</p>
+            ) : null}
+          </div>
         ) : null}
-        {mapsLinkError ? (
-          <p className="mt-2 text-sm font-bold text-rose-700" role="alert">
-            {mapsLinkError}
-          </p>
+
+        {locationMethod === "link" ? (
+          <label>
+            <span className="label">رابط Google Maps</span>
+            <div className="relative">
+              <input
+                className="field pr-12"
+                dir="ltr"
+                placeholder="https://maps.app.goo.gl/... أو https://www.google.com/maps/..."
+                value={property.googleMapsUrl}
+                onChange={(event) => {
+                  setMapsLinkError("");
+                  update("googleMapsUrl", event.target.value);
+                }}
+                onBlur={() => void validateMapsLink()}
+                aria-invalid={Boolean(mapsLinkError)}
+              />
+              <MapPinned
+                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-stone-500"
+                size={18}
+                aria-hidden="true"
+              />
+            </div>
+            {resolvingLink ? (
+              <p className="mt-2 text-sm font-bold text-stone-600">جاري التحقق من الرابط...</p>
+            ) : null}
+            {mapsLinkError ? (
+              <p className="mt-2 text-sm font-bold text-rose-700" role="alert">
+                {mapsLinkError}
+              </p>
+            ) : null}
+          </label>
         ) : null}
-      </label>
+
+        {locationMethod === "map" ? (
+          <PropertyLocationPicker
+            value={
+              property.lat !== undefined && property.lng !== undefined
+                ? { lat: property.lat, lng: property.lng }
+                : null
+            }
+            onChange={(coordinates) => {
+              update("lat", coordinates.lat);
+              update("lng", coordinates.lng);
+              update(
+                "googleMapsUrl",
+                getGoogleMapsUrl({ ...property, ...coordinates }, { canViewExact: true }) ?? "",
+              );
+              if (!property.locationVisibility) update("locationVisibility", "exact");
+            }}
+          />
+        ) : null}
+      </fieldset>
       <Select
         label="دقة عرض موقع السكن"
         value={property.locationVisibility ?? "exact"}
@@ -622,25 +647,8 @@ function LocationStep({ property, update }: { property: Property; update: Update
           update("locationVisibility", value as NonNullable<Property["locationVisibility"]>)
         }
       />
-      <PropertyLocationPicker
-        value={
-          property.lat !== undefined && property.lng !== undefined
-            ? { lat: property.lat, lng: property.lng }
-            : null
-        }
-        onChange={(coordinates) => {
-          update("lat", coordinates.lat);
-          update("lng", coordinates.lng);
-          update(
-            "googleMapsUrl",
-            getGoogleMapsUrl({ ...property, ...coordinates }, { canViewExact: true }) ?? "",
-          );
-          if (!property.locationVisibility) update("locationVisibility", "exact");
-        }}
-      />
       <div className="grid gap-2 rounded-2xl bg-linen p-4 md:col-span-2 xl:col-span-3">
         <p className="font-black text-ink">ملخص الموقع</p>
-        <p>✓ المنطقة: {property.region || "غير محددة"}</p>
         <p>✓ المدينة: {property.city || "غير محددة"}</p>
         <p>✓ الحي: {property.neighborhood || "غير محدد"}</p>
         <p>✓ المعلم: {property.landmark || "غير مضاف"}</p>
@@ -655,6 +663,82 @@ function LocationStep({ property, update }: { property: Property; update: Update
         </p>
       </div>
     </div>
+  );
+}
+
+function LandmarksEditor({
+  primaryLandmark,
+  onPrimaryLandmark,
+}: {
+  primaryLandmark: string;
+  onPrimaryLandmark: (value: string) => void;
+}) {
+  const [landmarks, setLandmarks] = useState([
+    { id: "landmark-1", name: primaryLandmark, url: "" },
+  ]);
+
+  function updateLandmark(id: string, key: "name" | "url", value: string) {
+    setLandmarks((current) =>
+      current.map((landmark) => (landmark.id === id ? { ...landmark, [key]: value } : landmark)),
+    );
+  }
+
+  return (
+    <fieldset className="grid gap-3 border border-stone-200 bg-linen p-4 md:col-span-2 xl:col-span-3">
+      <legend className="px-2 text-sm font-black text-ink">المعالم القريبة</legend>
+      <p className="text-xs font-bold text-stone-500">
+        أضف اسم كل معلم ورابطه في Google Maps، ثم اختر المعلم الأشهر الذي سيظهر في البطاقة.
+      </p>
+      <div className="grid gap-2">
+        {landmarks.map((landmark, index) => (
+          <div
+            className="grid gap-2 border border-stone-200 bg-white p-3 md:grid-cols-[1fr_1.4fr_auto]"
+            key={landmark.id}
+          >
+            <input
+              className="field"
+              value={landmark.name}
+              placeholder={`اسم المعلم ${index + 1}`}
+              onChange={(event) => {
+                updateLandmark(landmark.id, "name", event.target.value);
+                if (primaryLandmark === landmark.name || (!primaryLandmark && index === 0)) {
+                  onPrimaryLandmark(event.target.value);
+                }
+              }}
+            />
+            <input
+              className="field"
+              dir="ltr"
+              value={landmark.url}
+              placeholder="رابط Google Maps للمعلم"
+              onChange={(event) => updateLandmark(landmark.id, "url", event.target.value)}
+            />
+            <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 px-2 text-xs font-extrabold text-berry">
+              <input
+                type="radio"
+                name="primary-landmark"
+                checked={Boolean(landmark.name) && primaryLandmark === landmark.name}
+                onChange={() => onPrimaryLandmark(landmark.name)}
+              />
+              الأشهر
+            </label>
+          </div>
+        ))}
+      </div>
+      <button
+        className="secondary-button w-fit"
+        type="button"
+        onClick={() =>
+          setLandmarks((current) => [
+            ...current,
+            { id: `landmark-${Date.now()}`, name: "", url: "" },
+          ])
+        }
+      >
+        <Plus size={16} aria-hidden="true" />
+        إضافة معلم آخر
+      </button>
+    </fieldset>
   );
 }
 
@@ -714,10 +798,27 @@ function DetailsStep({
         inputMode="numeric"
         onChange={(value) => update("bathrooms", Number(value.replace(/\D/g, "")) || 0)}
       />
+      <Input
+        label="عدد الأدوار"
+        placeholder="مثال: 4"
+        value={property.floorsCount ? String(property.floorsCount) : ""}
+        inputMode="numeric"
+        onChange={(value) => update("floorsCount", Number(value.replace(/\D/g, "")) || 0)}
+      />
       <Toggle
         label="هل السكن مفروش؟"
         checked={property.furnished}
         onChange={(value) => update("furnished", value)}
+      />
+      <Toggle
+        label="تتوفر مواصلات"
+        checked={property.hasTransportService}
+        onChange={(value) => update("hasTransportService", value)}
+      />
+      <Toggle
+        label="يمر باص الجامعة"
+        checked={property.universityBusPasses}
+        onChange={(value) => update("universityBusPasses", value)}
       />
       <ChecklistGroup
         legend="مميزات السكن"
@@ -797,6 +898,7 @@ function MediaStep({
   property,
   update,
   updateRentalPrices,
+  primaryRentalPeriod,
   uploadImages,
   uploadVideos,
   uploadProgress,
@@ -804,7 +906,8 @@ function MediaStep({
 }: {
   property: Property;
   update: UpdateFn;
-  updateRentalPrices: (prices: RentalPrices) => void;
+  updateRentalPrices: (prices: RentalPrices, primaryPeriod?: RentalPeriod) => void;
+  primaryRentalPeriod: RentalPeriod;
   uploadImages: (files: FileList | null) => void;
   uploadVideos: (files: FileList | null) => void;
   uploadProgress: Array<{ id: string; progress: MediaUploadProgress }>;
@@ -845,16 +948,33 @@ function MediaStep({
                     {rentalPeriodLabels[period]}
                   </label>
                   {selected ? (
-                    <label className="mt-3 block">
-                      <span className="label">السعر بالريال</span>
-                      <input
-                        className="field"
-                        inputMode="numeric"
-                        placeholder="مثال: 2000"
-                        value={prices[period] ? String(prices[period]) : ""}
-                        onChange={(event) => setRentalPrice(period, event.target.value)}
-                      />
-                    </label>
+                    <div className="mt-3 grid gap-3">
+                      <label>
+                        <span className="label">السعر بالريال</span>
+                        <input
+                          className="field"
+                          inputMode="numeric"
+                          placeholder="مثال: 2000"
+                          value={prices[period] ? String(prices[period]) : ""}
+                          onChange={(event) => setRentalPrice(period, event.target.value)}
+                        />
+                      </label>
+                      <label
+                        className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs font-black ${
+                          primaryRentalPeriod === period
+                            ? "border-berry bg-berry/5 text-berry"
+                            : "border-stone-200 text-stone-600"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="primary-rental-price"
+                          checked={primaryRentalPeriod === period}
+                          onChange={() => updateRentalPrices(prices, period)}
+                        />
+                        إظهار هذا السعر في الصفحة الرئيسية
+                      </label>
+                    </div>
                   ) : null}
                 </div>
               );
@@ -989,10 +1109,16 @@ function MediaStep({
   );
 }
 
-function ReviewStep({ property }: { property: Property }) {
+function ReviewStep({
+  property,
+  primaryRentalPeriod,
+}: {
+  property: Property;
+  primaryRentalPeriod: RentalPeriod;
+}) {
   const googleMapsUrl = getGoogleMapsUrl(property, { canViewExact: true });
   const items = [
-    ["المنطقة", property.region || "غير محددة"],
+    ["اسم السكن", property.title],
     ["المدينة", property.city],
     ["الحي", property.neighborhood],
     ["المعلم", property.landmark || "غير مضاف"],
@@ -1004,6 +1130,12 @@ function ReviewStep({ property }: { property: Property }) {
     ],
     ["عدد الغرف", formatRooms(property)],
     ["الأسعار", formatRentalPrices(property)],
+    [
+      "السعر الظاهر في الصفحة الرئيسية",
+      property.price > 0
+        ? `${property.price.toLocaleString("ar-SA")} ريال / ${rentalPeriodLabels[primaryRentalPeriod]}`
+        : "غير محدد",
+    ],
     [
       "مميزات السكن",
       propertyFeatureOptions
@@ -1047,6 +1179,11 @@ function ReviewStep({ property }: { property: Property }) {
       />
       <div className="rounded-2xl bg-linen p-5">
         <h2 className="text-2xl font-black text-ink">مراجعة نهائية قبل النشر</h2>
+        <p className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-black text-mintdeep">
+          <span>رسوم نشر الإعلان:</span>
+          <span className="text-stone-500 line-through decoration-2">300 ريال</span>
+          <span>150 ريال بعد الخصم</span>
+        </p>
         <dl className="mt-5 grid gap-3 md:grid-cols-2">
           {items.map(([label, value]) => (
             <div className="rounded-xl bg-white/80 p-3" key={label}>

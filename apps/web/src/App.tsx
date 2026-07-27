@@ -3,7 +3,6 @@ import { Loader2 } from "lucide-react";
 import AppBar from "./components/AppBar";
 import DashboardShell from "./components/DashboardShell";
 import Footer from "./components/Footer";
-import LandingPage from "./pages/LandingPage";
 import { useAuthService } from "./auth";
 import {
   getSelectedUniversityBranch,
@@ -13,6 +12,7 @@ import type { Owner, Property, UniversityLocation, User } from "@saknaha/shared-
 import { useAdminData } from "./data/AdminDataContext";
 
 const AuthModal = lazy(() => import("./components/AuthModal"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 const AddPropertyPage = lazy(() => import("./pages/AddPropertyPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
@@ -181,6 +181,11 @@ export default function App() {
   }
 
   function goOwnerLogin() {
+    if (owner) {
+      setRoute("owner-dashboard");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     openAuthModal("owner");
   }
 
@@ -216,6 +221,12 @@ export default function App() {
 
   function goHousing() {
     navigatePublic({ route: "housing" });
+  }
+
+  function scrollDashboardSection(id: string) {
+    window.requestAnimationFrame(() =>
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
   }
 
   function goCity(nextCity: string) {
@@ -290,11 +301,6 @@ export default function App() {
 
   function goRoommateDetails(nextRequestId: string) {
     const next = { route: "roommate-detail" as const, requestId: nextRequestId };
-    if (!user) {
-      setPendingUserRoute(next);
-      openAuthModal("user");
-      return;
-    }
     navigatePublic(next);
   }
 
@@ -370,18 +376,6 @@ export default function App() {
     navigatePublic({ route: "support" });
   }
 
-  function scrollToCities() {
-    if (route !== "landing") {
-      navigatePublic({ route: "landing" });
-      window.setTimeout(
-        () => document.getElementById("cities")?.scrollIntoView({ behavior: "smooth" }),
-        80,
-      );
-      return;
-    }
-    document.getElementById("cities")?.scrollIntoView({ behavior: "smooth" });
-  }
-
   async function handleOwnerLogout() {
     await handleAccountLogout();
   }
@@ -396,9 +390,8 @@ export default function App() {
     navigatePublic({ route: "landing" });
   }
 
-  const protectedGuestRoute = !user && route === "roommate-detail" && requestId;
-  const effectiveAuthModalOpen = authModalOpen || Boolean(protectedGuestRoute);
-  const effectiveAuthModalIntent = authModalIntent ?? (protectedGuestRoute ? "user" : null);
+  const effectiveAuthModalOpen = authModalOpen;
+  const effectiveAuthModalIntent = authModalIntent;
 
   function frame(children: ReactNode, showFooter = false) {
     return (
@@ -406,10 +399,11 @@ export default function App() {
         <AppBar
           onHome={goHome}
           onProfile={goProfile}
+          onOwner={goOwnerLogin}
+          onHousing={goHousing}
+          onRoommates={goRoommates}
           onLogout={handleAccountLogout}
           accountName={owner?.fullName ?? user?.name}
-          onCities={scrollToCities}
-          onCity={goCity}
           onAbout={goAbout}
           onFaq={goFaq}
           onSupport={goSupport}
@@ -419,8 +413,10 @@ export default function App() {
           <Footer
             onHome={() => navigatePublic({ route: "landing" })}
             onOwner={goOwnerLogin}
-            onUser={goUserStart}
-            onCities={scrollToCities}
+            onHousing={goHousing}
+            onCities={goHousing}
+            onRoommates={goRoommates}
+            onAbout={goAbout}
             onFaq={goFaq}
             onSupport={goSupport}
           />
@@ -433,7 +429,6 @@ export default function App() {
               initialIntent={effectiveAuthModalIntent}
               onClose={() => {
                 setAuthModalOpen(false);
-                if (protectedGuestRoute) navigatePublic({ route: "roommates" });
               }}
               onOwnerAuthenticated={completeOwnerAuth}
               onUserAuthenticated={completeUserAuth}
@@ -463,7 +458,24 @@ export default function App() {
 
   if (route === "owner-dashboard" && owner) {
     return frame(
-      <DashboardShell kind="owner" name={owner.fullName} status="صاحب سكن">
+      <DashboardShell
+        kind="owner"
+        name={owner.fullName}
+        status="صاحب سكن"
+        publicCode={owner.publicCode}
+        onNavigate={(label) => {
+          if (label === "إضافة عقار") {
+            setEditingProperty(null);
+            setRoute("add-property");
+          } else if (label === "عقاراتي" || label === "طلبات العقارات" || label === "المدفوعات") {
+            setRoute("manage-property");
+          } else if (label === "تسجيل الخروج") {
+            void handleOwnerLogout();
+          } else {
+            scrollDashboardSection("owner-dashboard-overview");
+          }
+        }}
+      >
         <OwnerDashboardPage
           owner={owner}
           onLogout={handleOwnerLogout}
@@ -547,18 +559,36 @@ export default function App() {
 
   if (route === "user-dashboard" && user) {
     return frame(
-      <UserDashboardPage
-        user={user}
-        onFindHousing={() => goFilteredHousing(user.city)}
-        onFindRoommates={() => goFilteredRoommates(user.city)}
-        onCreateRoommateCard={() => goRoommateCreate(user.city)}
-        onProperty={goPropertyFromUserDashboard}
-        onRoommateDetails={goRoommateDetailsFromUserDashboard}
-        onUserUpdated={setUser}
-        onLogout={handleAccountLogout}
-        selectedUniversity={effectiveSelectedUniversity}
-        onUniversityChange={handleUniversityChange}
-      />,
+      <DashboardShell
+        kind="user"
+        name={user.name}
+        status="باحثة عن سكن"
+        publicCode={user.publicCode}
+        onNavigate={(label) => {
+          if (label === "البحث عن سكن") goFilteredHousing(user.city);
+          else if (label === "البحث عن شريكة سكن") goFilteredRoommates(user.city);
+          else if (label === "إنشاء بطاقة شريكة سكن") goRoommateCreate(user.city);
+          else if (label === "تسجيل الخروج") void handleAccountLogout();
+          else if (label === "بطاقاتي") scrollDashboardSection("user-roommate-cards");
+          else if (label === "اهتمامات شريكات السكن") scrollDashboardSection("user-join-requests");
+          else if (label === "الاهتمامات") scrollDashboardSection("user-interests");
+          else if (label === "التفضيلات") scrollDashboardSection("user-preferences");
+          else scrollDashboardSection("user-dashboard-overview");
+        }}
+      >
+        <UserDashboardPage
+          user={user}
+          onFindHousing={() => goFilteredHousing(user.city)}
+          onFindRoommates={() => goFilteredRoommates(user.city)}
+          onCreateRoommateCard={() => goRoommateCreate(user.city)}
+          onProperty={goPropertyFromUserDashboard}
+          onRoommateDetails={goRoommateDetailsFromUserDashboard}
+          onUserUpdated={setUser}
+          onLogout={handleAccountLogout}
+          selectedUniversity={effectiveSelectedUniversity}
+          onUniversityChange={handleUniversityChange}
+        />
+      </DashboardShell>,
       true,
     );
   }
@@ -609,8 +639,7 @@ export default function App() {
         onProperty={goProperty}
         onRoommateDetails={goRoommateDetails}
         onRoommates={goRoommates}
-        selectedUniversity={effectiveSelectedUniversity}
-        onUniversityChange={handleUniversityChange}
+        onHome={goHome}
       />,
       true,
     );
@@ -658,28 +687,16 @@ export default function App() {
     );
   }
 
-  if (route === "roommate-detail" && !user) {
-    return frame(
-      <RoommatesPage
-        key={`roommates-guest-${cityName || "all"}`}
-        onDetails={goRoommateDetails}
-        onProperty={goProperty}
-        onHousing={goHousing}
-        onHome={goHome}
-        initialCity={cityName || "all"}
-      />,
-      true,
-    );
-  }
-
   if (route === "roommate-detail") {
     return frame(
       <RoommateDetailsPage
         requestId={requestId}
         user={user}
         onBack={goBackFromRoommateDetails}
-        selectedUniversity={effectiveSelectedUniversity}
-        onUniversityChange={handleUniversityChange}
+        onLogin={() => {
+          setPendingUserRoute({ route: "roommate-detail", requestId });
+          openAuthModal("user");
+        }}
       />,
       true,
     );
@@ -714,6 +731,7 @@ export default function App() {
     <LandingPage
       onUser={goUserStart}
       onHousing={goHousing}
+      onProperty={goProperty}
       onCity={goCity}
       onRoommates={goRoommates}
       onRoommateDetails={goRoommateDetails}

@@ -2,7 +2,10 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { addRoommateRequest } from "../services/propertyService";
 import type { Property, User, UserRole } from "@saknaha/shared-types";
+import type { RoommateLifestylePreferences } from "@saknaha/shared-types";
 import { formatRooms } from "@saknaha/utils/propertyFormat";
+import RoommatePreferencesFields from "./RoommatePreferencesFields";
+import { defaultRoommatePreferences } from "../services/roommatePreferenceDefaults";
 
 interface RoommateRequestFormProps {
   property: Property;
@@ -17,6 +20,9 @@ export default function RoommateRequestForm({ property, user, onDone }: Roommate
   const [major, setMajor] = useState("");
   const [moveInDate, setMoveInDate] = useState("");
   const [bio, setBio] = useState("");
+  const [preferences, setPreferences] = useState<RoommateLifestylePreferences>(
+    defaultRoommatePreferences,
+  );
   const [saved, setSaved] = useState(false);
 
   const totalRooms = property.maxRooms;
@@ -38,6 +44,9 @@ export default function RoommateRequestForm({ property, user, onDone }: Roommate
       moveInDate: moveInDate.trim(),
       bio: bio.trim(),
       availableRooms,
+      source: "saknaha_property",
+      pricePerPerson: Math.ceil(property.price / Math.max(1, property.maxResidents)),
+      preferences,
     });
     setSaved(true);
     onDone();
@@ -133,6 +142,9 @@ export default function RoommateRequestForm({ property, user, onDone }: Roommate
             onChange={(event) => setBio(event.target.value)}
           />
         </label>
+      </div>
+      <div className="mt-4">
+        <RoommatePreferencesFields value={preferences} onChange={setPreferences} />
       </div>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
