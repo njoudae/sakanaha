@@ -1,4 +1,4 @@
-import logo from "../assets/saknaha-logo.png";
+import logo from "../assets/saknaha-logo.webp";
 import type { ReactNode } from "react";
 
 interface FooterProps {

@@ -1,6 +1,6 @@
 import { ChevronDown, Phone, UserCircle } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
-import logo from "../assets/saknaha-logo.png";
+import logo from "../assets/saknaha-logo.webp";
 
 interface AppBarProps {
   onHome: () => void;

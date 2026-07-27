@@ -1,4 +1,4 @@
-import saknahaLogoUrl from "../assets/saknaha-logo.png";
+import saknahaLogoUrl from "../assets/saknaha-logo.webp";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
