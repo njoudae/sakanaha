@@ -1,7 +1,6 @@
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
-import { fileURLToPath } from "node:url";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -9,19 +8,6 @@ export default defineConfig(({ mode }) => {
     env.SENTRY_AUTH_TOKEN && env.SENTRY_ORG && env.SENTRY_PROJECT && env.VITE_APP_RELEASE,
   );
   return {
-    resolve: {
-      alias:
-        mode === "development"
-          ? []
-          : [
-              {
-                find: "./localDevelopmentExamples",
-                replacement: fileURLToPath(
-                  new URL("./src/data/localDevelopmentExamples.empty.ts", import.meta.url),
-                ),
-              },
-            ],
-    },
     plugins: [
       react(),
       sentryUploadEnabled

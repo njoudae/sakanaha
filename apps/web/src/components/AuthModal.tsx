@@ -33,9 +33,37 @@ export default function AuthModal({
   if (!open) return null;
 
   const hasProvider =
+    authService.capabilities.demoDirectPhone ||
     authService.capabilities.google ||
     authService.capabilities.emailOtp ||
     authService.capabilities.phoneOtp;
+
+  async function signInToDemo(event: FormEvent) {
+    event.preventDefault();
+    if (!intent || !contact.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      if (intent === "owner") {
+        const owner = await authService.loginOwnerWithPhone(contact.trim());
+        if (!owner) {
+          setError("رقم الجوال غير مرتبط بحساب العرض.");
+          return;
+        }
+        onOwnerAuthenticated(owner);
+      } else {
+        const user = await authService.loginUserWithPhone(contact.trim());
+        if (!user) {
+          setError("رقم الجوال غير مرتبط بحساب العرض.");
+          return;
+        }
+        onUserAuthenticated(user);
+      }
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function completeAuthenticatedSession() {
     const owner = authService.getCurrentOwner();
@@ -140,6 +168,30 @@ export default function AuthModal({
           </div>
         ) : (
           <div className="mt-6 grid gap-3">
+            {authService.capabilities.demoDirectPhone ? (
+              <form className="grid gap-3 rounded-2xl bg-linen p-4" onSubmit={signInToDemo}>
+                <label>
+                  <span className="label">رقم الجوال</span>
+                  <input
+                    className="field"
+                    inputMode="numeric"
+                    type="tel"
+                    value={contact}
+                    onChange={(event) => setContact(event.target.value)}
+                    placeholder="05xxxxxxxx"
+                    required
+                  />
+                </label>
+                <button className="primary-button w-full" disabled={loading} type="submit">
+                  {loading ? (
+                    <Loader2 className="animate-spin" size={18} aria-hidden="true" />
+                  ) : (
+                    <LogIn size={18} aria-hidden="true" />
+                  )}
+                  دخول حساب العرض
+                </button>
+              </form>
+            ) : null}
             {authService.capabilities.google ? (
               <button
                 className="secondary-button w-full"

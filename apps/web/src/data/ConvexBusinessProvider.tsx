@@ -242,17 +242,13 @@ export function ConvexBusinessProvider({
     const propertyIds = new Set(convexProperties.map((property) => property.id));
     const properties = [
       ...convexProperties,
-      ...(import.meta.env.DEV ? localDevelopmentProperties : []).filter(
-        (property) => !propertyIds.has(property.id),
-      ),
+      ...localDevelopmentProperties.filter((property) => !propertyIds.has(property.id)),
     ];
     const convexRoommateRequests = snapshot.roommateRequests.map(roommateFromRow);
     const roommateRequestIds = new Set(convexRoommateRequests.map((request) => request.id));
     const roommateRequests = [
       ...convexRoommateRequests,
-      ...(import.meta.env.DEV ? localDevelopmentRoommateRequests : []).filter(
-        (request) => !roommateRequestIds.has(request.id),
-      ),
+      ...localDevelopmentRoommateRequests.filter((request) => !roommateRequestIds.has(request.id)),
     ];
     const allProperties = new Map(
       [...snapshot.properties, ...snapshot.ownerProperties, ...snapshot.favorites].map((row) => [

@@ -4,6 +4,7 @@ export interface AuthCapabilities {
   google: boolean;
   emailOtp: boolean;
   phoneOtp: boolean;
+  demoDirectPhone: boolean;
   apple: boolean;
   sessionRefresh: boolean;
 }

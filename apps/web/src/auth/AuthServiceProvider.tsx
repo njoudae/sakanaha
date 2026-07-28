@@ -27,43 +27,8 @@ import {
 } from "../data/NotificationDataContext";
 import { browserMapsData, MapsDataContext, type MapsDataValue } from "../data/MapsDataContext";
 import { ConvexBusinessProvider } from "../data/ConvexBusinessProvider";
-
-const unavailableAuthService: AuthService = {
-  kind: "convex",
-  capabilities: {
-    google: false,
-    emailOtp: false,
-    phoneOtp: false,
-    apple: false,
-    sessionRefresh: false,
-  },
-  universityBranches: [],
-  selectedUniversityBranch: null,
-  getCurrentOwner: () => null,
-  getCurrentUser: () => null,
-  loginOwnerWithPhone: async () => null,
-  loginUserWithPhone: async () => null,
-  registerOwner: async () => {
-    throw new Error("Authentication is not configured.");
-  },
-  registerUser: async () => {
-    throw new Error("Authentication is not configured.");
-  },
-  logout: async () => undefined,
-  signInWithGoogle: async () => {
-    throw new Error("Authentication is not configured.");
-  },
-  requestEmailOtp: async () => {
-    throw new Error("Authentication is not configured.");
-  },
-  verifyEmailOtp: async () => false,
-  requestPhoneOtp: async () => {
-    throw new Error("Authentication is not configured.");
-  },
-  verifyPhoneOtp: async () => false,
-  refreshSession: async () => false,
-  saveSelectedUniversityBranch: async () => undefined,
-};
+import { ShowcaseBusinessProvider } from "../data/ShowcaseBusinessProvider";
+import { demoAuthService } from "./demoAuthService";
 
 function browserSessionStorage(): TokenStorage | undefined {
   return typeof window === "undefined" ? undefined : window.sessionStorage;
@@ -74,6 +39,7 @@ function capabilitiesFromFlags(flags: FeatureFlagMap) {
     google: flags["auth.google.enabled"],
     emailOtp: flags["auth.emailOtp.enabled"],
     phoneOtp: flags["auth.phoneOtp.enabled"],
+    demoDirectPhone: false,
     apple: false,
     sessionRefresh: true,
   };
@@ -614,12 +580,12 @@ export function AuthServiceProvider({ children }: { children: ReactNode }) {
   if (convexClient === null) {
     if (dataClient === null) {
       return (
-        <AuthServiceContext.Provider value={unavailableAuthService}>
+        <AuthServiceContext.Provider value={demoAuthService}>
           <AdminDataContext.Provider value={emptyAdminData}>
             <NotificationDataContext.Provider value={emptyNotificationData}>
               <MapsDataContext.Provider value={browserMapsData}>
                 <MediaServiceContext.Provider value={browserMediaService}>
-                  {children}
+                  <ShowcaseBusinessProvider>{children}</ShowcaseBusinessProvider>
                 </MediaServiceContext.Provider>
               </MapsDataContext.Provider>
             </NotificationDataContext.Provider>
@@ -629,7 +595,7 @@ export function AuthServiceProvider({ children }: { children: ReactNode }) {
     }
     return (
       <ConvexProvider client={dataClient}>
-        <AuthServiceContext.Provider value={unavailableAuthService}>
+        <AuthServiceContext.Provider value={demoAuthService}>
           <AdminDataContext.Provider value={emptyAdminData}>
             <NotificationDataContext.Provider value={emptyNotificationData}>
               <MapsDataContext.Provider value={browserMapsData}>
