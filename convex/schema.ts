@@ -6,6 +6,9 @@ import {
   deliveryStatus,
   distanceUnit,
   featureFlagScope,
+  identityProviderLinkStatus,
+  identitySessionStatus,
+  identityStatus,
   interestMode,
   interestStatus,
   jobStatus,
@@ -137,6 +140,49 @@ export default defineSchema(
       .index("by_email", ["email"])
       .index("by_primary_role", ["primaryRole"])
       .index("by_status", ["status"]),
+
+    identities: defineTable({
+      identityKey: v.string(),
+      userProfileId: v.id("userProfiles"),
+      status: identityStatus,
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      revokedAt: v.optional(v.number()),
+    })
+      .index("by_identity_key", ["identityKey"])
+      .index("by_user_profile", ["userProfileId"])
+      .index("by_status", ["status"]),
+
+    identityProviderLinks: defineTable({
+      identityId: v.id("identities"),
+      providerKey: v.string(),
+      providerSubjectHash: v.string(),
+      status: identityProviderLinkStatus,
+      verifiedAt: v.number(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      revokedAt: v.optional(v.number()),
+    })
+      .index("by_provider_and_subject_hash", ["providerKey", "providerSubjectHash"])
+      .index("by_identity_and_provider", ["identityId", "providerKey"])
+      .index("by_identity_and_status", ["identityId", "status"]),
+
+    identitySessions: defineTable({
+      identityId: v.id("identities"),
+      tokenHash: v.string(),
+      status: identitySessionStatus,
+      expiresAt: v.number(),
+      refreshExpiresAt: v.number(),
+      lastValidatedAt: v.optional(v.number()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      revokedAt: v.optional(v.number()),
+      replacedBySessionId: v.optional(v.id("identitySessions")),
+    })
+      .index("by_token_hash", ["tokenHash"])
+      .index("by_identity_and_status", ["identityId", "status"])
+      .index("by_status_and_expires_at", ["status", "expiresAt"])
+      .index("by_status_and_refresh_expires_at", ["status", "refreshExpiresAt"]),
 
     ownerProfiles: defineTable({
       userId: v.id("userProfiles"),

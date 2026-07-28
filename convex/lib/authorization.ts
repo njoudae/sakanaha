@@ -1,16 +1,24 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import type { Id } from "../_generated/dataModel";
 
+export async function authenticatedIdentityKey(
+  ctx: QueryCtx | MutationCtx,
+): Promise<string | null> {
+  const runtimeIdentity = await ctx.auth.getUserIdentity();
+  if (runtimeIdentity === null) return null;
+  const identityKey = (runtimeIdentity as unknown as Record<string, unknown>).identityKey;
+  return typeof identityKey === "string" && identityKey.trim() ? identityKey.trim() : null;
+}
+
 export async function requireActiveProfile(
   ctx: QueryCtx | MutationCtx,
 ): Promise<Doc<"userProfiles">> {
-  const authUserId = await getAuthUserId(ctx);
-  if (authUserId === null) throw new Error("Authentication required.");
+  const identityKey = await authenticatedIdentityKey(ctx);
+  if (identityKey === null) throw new Error("Authentication required.");
   const profile = await ctx.db
     .query("userProfiles")
-    .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
+    .withIndex("by_identity_key", (q) => q.eq("identityKey", identityKey))
     .unique();
   if (profile === null || profile.status !== "active") {
     throw new Error("An active user profile is required.");

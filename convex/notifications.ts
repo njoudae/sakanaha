@@ -1,26 +1,15 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
+import { requireActiveProfile } from "./lib/authorization";
 import { notificationChannels, notificationStatus, quietHours } from "./validators";
 import {
   DEFAULT_NOTIFICATION_CHANNELS,
   normalizeNotificationDeepLink,
   validateQuietHours,
 } from "./notificationSupport";
-
-async function currentProfile(ctx: QueryCtx | MutationCtx) {
-  const authUserId = await getAuthUserId(ctx);
-  if (authUserId === null) throw new Error("Authentication required.");
-  const profile = await ctx.db
-    .query("userProfiles")
-    .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
-    .unique();
-  if (profile === null || profile.status !== "active") throw new Error("Active profile required.");
-  return profile;
-}
 
 function publicNotification(notification: Doc<"notifications">) {
   const data = notification.data as { deepLink?: unknown } | undefined;
@@ -53,7 +42,7 @@ export const list = query({
     status: v.optional(notificationStatus),
   },
   handler: async (ctx, args) => {
-    const profile = await currentProfile(ctx);
+    const profile = await requireActiveProfile(ctx);
     const result =
       args.status === undefined
         ? await ctx.db
@@ -75,7 +64,7 @@ export const list = query({
 export const unreadSummary = query({
   args: {},
   handler: async (ctx) => {
-    const profile = await currentProfile(ctx);
+    const profile = await requireActiveProfile(ctx);
     const unread = await ctx.db
       .query("notifications")
       .withIndex("by_user_status_created", (q) =>
@@ -90,7 +79,7 @@ export const unreadSummary = query({
 export const getPreferences = query({
   args: {},
   handler: async (ctx) => {
-    const profile = await currentProfile(ctx);
+    const profile = await requireActiveProfile(ctx);
     const preferences = await ctx.db
       .query("notificationPreferences")
       .withIndex("by_user", (q) => q.eq("userId", profile._id))
@@ -110,7 +99,7 @@ export const updatePreferences = mutation({
     quietHours: v.optional(quietHours),
   },
   handler: async (ctx, args) => {
-    const profile = await currentProfile(ctx);
+    const profile = await requireActiveProfile(ctx);
     const eventTypes = args.eventTypes ?? {};
     const eventEntries = Object.entries(eventTypes);
     if (
@@ -161,7 +150,7 @@ export const updatePreferences = mutation({
 });
 
 async function ownedNotification(ctx: MutationCtx, notificationId: Doc<"notifications">["_id"]) {
-  const profile = await currentProfile(ctx);
+  const profile = await requireActiveProfile(ctx);
   const notification = await ctx.db.get("notifications", notificationId);
   if (notification === null || notification.userId !== profile._id) {
     throw new Error("Notification not found.");
@@ -205,7 +194,7 @@ export const archive = mutation({
 export const markAllRead = mutation({
   args: {},
   handler: async (ctx) => {
-    const profile = await currentProfile(ctx);
+    const profile = await requireActiveProfile(ctx);
     const unread = await ctx.db
       .query("notifications")
       .withIndex("by_user_status_created", (q) =>

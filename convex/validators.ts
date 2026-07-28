@@ -44,6 +44,16 @@ export const paymentStatus = v.union(
 
 export const paymentEntityType = v.union(v.literal("property"), v.literal("roommate_card"));
 
+export const identityStatus = v.union(v.literal("active"), v.literal("revoked"));
+
+export const identityProviderLinkStatus = v.union(v.literal("active"), v.literal("revoked"));
+
+export const identitySessionStatus = v.union(
+  v.literal("active"),
+  v.literal("revoked"),
+  v.literal("expired"),
+);
+
 export const profileStatus = v.union(
   v.literal("active"),
   v.literal("pending_claim"),

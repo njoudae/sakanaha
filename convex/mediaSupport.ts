@@ -1,6 +1,6 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { requireActiveProfile } from "./lib/authorization";
 
 type DatabaseCtx = QueryCtx | MutationCtx;
 
@@ -9,19 +9,7 @@ export const MAX_PROPERTY_VIDEOS = 10;
 export const MAX_UPLOAD_RETRIES = 3;
 export const UPLOAD_TTL_MS = 30 * 60 * 1000;
 
-export async function requireActiveProfile(ctx: DatabaseCtx) {
-  const authUserId = await getAuthUserId(ctx);
-  if (authUserId === null) throw new Error("Authentication required.");
-
-  const profile = await ctx.db
-    .query("userProfiles")
-    .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
-    .unique();
-  if (profile === null || profile.status !== "active") {
-    throw new Error("An active user profile is required.");
-  }
-  return profile;
-}
+export { requireActiveProfile };
 
 export async function canManageProperty(
   ctx: DatabaseCtx,

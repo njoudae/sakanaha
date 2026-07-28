@@ -13,8 +13,10 @@ describe("M19 submission workflow", () => {
     const setup = await t.run(async (ctx) => {
       const now = Date.now();
       const authUserId = await ctx.db.insert("users", {});
+      const identityKey = `test-identity-${String(authUserId)}`;
       const userId = await ctx.db.insert("userProfiles", {
         authUserId,
+        identityKey,
         name: "Owner",
         primaryRole: "real_estate_agent",
         status: "active",
@@ -70,9 +72,12 @@ describe("M19 submission workflow", () => {
         createdAt: now,
         updatedAt: now,
       });
-      return { authUserId, userId, propertyId };
+      return { authUserId, identityKey, userId, propertyId };
     });
-    const owner = t.withIdentity({ subject: setup.authUserId });
+    const owner = t.withIdentity({
+      subject: setup.authUserId,
+      identityKey: setup.identityKey,
+    });
     await expect(
       owner.mutation(api.submissions.submitPropertyForReview, {
         propertyId: setup.propertyId,
@@ -111,8 +116,10 @@ describe("M19 submission workflow", () => {
     const setup = await t.run(async (ctx) => {
       const now = Date.now();
       const authUserId = await ctx.db.insert("users", {});
+      const identityKey = `test-identity-${String(authUserId)}`;
       const userId = await ctx.db.insert("userProfiles", {
         authUserId,
+        identityKey,
         name: "Direct approval account",
         phone: "+966582968140",
         primaryRole: "real_estate_agent",
@@ -202,10 +209,13 @@ describe("M19 submission workflow", () => {
         createdAt: now,
         updatedAt: now,
       });
-      return { authUserId, propertyId, requestId };
+      return { authUserId, identityKey, propertyId, requestId };
     });
 
-    const account = t.withIdentity({ subject: setup.authUserId });
+    const account = t.withIdentity({
+      subject: setup.authUserId,
+      identityKey: setup.identityKey,
+    });
     await account.mutation(api.submissions.submitPropertyForReview, {
       propertyId: setup.propertyId,
     });

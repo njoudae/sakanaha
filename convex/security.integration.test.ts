@@ -14,15 +14,17 @@ async function createIdentity(
   return await t.run(async (ctx) => {
     const now = Date.now();
     const authUserId = await ctx.db.insert("users", {});
+    const identityKey = `test-identity-${String(authUserId)}`;
     const profileId = await ctx.db.insert("userProfiles", {
       authUserId,
+      identityKey,
       name: `${primaryRole} security test`,
       primaryRole,
       status: "active",
       createdAt: now,
       updatedAt: now,
     });
-    return { authUserId, profileId };
+    return { authUserId, identityKey, profileId };
   });
 }
 
@@ -42,7 +44,7 @@ describe("M16 security boundaries", () => {
     const t = convexTest(schema, modules);
     const identity = await createIdentity(t, "user");
     await t
-      .withIdentity({ subject: identity.authUserId })
+      .withIdentity({ subject: identity.authUserId, identityKey: identity.identityKey })
       .mutation(api.authSecurity.recordAuthClientEvent, {
         event: "otp_failed",
         provider: "email-otp",
@@ -65,9 +67,11 @@ describe("M16 security boundaries", () => {
       const t = convexTest(schema, modules);
       const identity = await createIdentity(t, role);
       await expect(
-        t.withIdentity({ subject: identity.authUserId }).query(api.observability.listUsage, {
-          paginationOpts: { numItems: 10, cursor: null },
-        }),
+        t
+          .withIdentity({ subject: identity.authUserId, identityKey: identity.identityKey })
+          .query(api.observability.listUsage, {
+            paginationOpts: { numItems: 10, cursor: null },
+          }),
       ).rejects.toThrow("Observability access required");
     },
   );
@@ -90,12 +94,12 @@ describe("M16 security boundaries", () => {
     });
 
     const usage = await t
-      .withIdentity({ subject: admin.authUserId })
+      .withIdentity({ subject: admin.authUserId, identityKey: admin.identityKey })
       .query(api.observability.listUsage, { paginationOpts: { numItems: 10, cursor: null } });
     expect(usage.page).toHaveLength(1);
 
     const audit = await t
-      .withIdentity({ subject: support.authUserId })
+      .withIdentity({ subject: support.authUserId, identityKey: support.identityKey })
       .query(api.observability.listAudit, { paginationOpts: { numItems: 10, cursor: null } });
     expect(audit.page[0]).not.toHaveProperty("_id");
     expect(audit.page[0]).not.toHaveProperty("_creationTime");

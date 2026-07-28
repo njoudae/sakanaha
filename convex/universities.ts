@@ -1,8 +1,8 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { mockUniversities, mockUniversitiesCatalog } from "@saknaha/constants/mockUniversities";
+import { authenticatedIdentityKey, requireActiveProfile } from "./lib/authorization";
 
 function validLatitude(value: number) {
   return Number.isFinite(value) && value >= -90 && value <= 90;
@@ -56,11 +56,11 @@ export const listActiveBranches = query({
 export const currentSelectedBranch = query({
   args: {},
   handler: async (ctx) => {
-    const authUserId = await getAuthUserId(ctx);
-    if (authUserId === null) return null;
+    const identityKey = await authenticatedIdentityKey(ctx);
+    if (identityKey === null) return null;
     const profile = await ctx.db
       .query("userProfiles")
-      .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
+      .withIndex("by_identity_key", (q) => q.eq("identityKey", identityKey))
       .unique();
     if (!profile?.selectedUniversityBranchId) return null;
     const branch = await ctx.db.get(profile.selectedUniversityBranchId);
@@ -84,14 +84,7 @@ export const currentSelectedBranch = query({
 export const saveSelectedBranch = mutation({
   args: { branchExternalId: v.union(v.string(), v.null()) },
   handler: async (ctx, args) => {
-    const authUserId = await getAuthUserId(ctx);
-    if (authUserId === null) throw new Error("Authentication required.");
-
-    const profile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
-      .unique();
-    if (profile === null) throw new Error("User profile not found.");
+    const profile = await requireActiveProfile(ctx);
 
     if (args.branchExternalId === null) {
       await ctx.db.patch(profile._id, {

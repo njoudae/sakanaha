@@ -1,4 +1,3 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   createProviderConfiguration,
   hasExpectedImageSignature,
@@ -19,6 +18,7 @@ import {
   requireActiveProfile,
   requireMediaManager,
 } from "./mediaSupport";
+import { authenticatedIdentityKey } from "./lib/authorization";
 
 const THUMBNAIL_MAX_BYTES = 512 * 1024;
 
@@ -437,11 +437,11 @@ export const listForProperty = query({
     const property = await ctx.db.get("properties", args.propertyId);
     if (!property || property.deletedAt !== undefined) return [];
     let authorized = property.status === "published";
-    const authUserId = await getAuthUserId(ctx);
-    if (!authorized && authUserId) {
+    const identityKey = await authenticatedIdentityKey(ctx);
+    if (!authorized && identityKey) {
       const profile = await ctx.db
         .query("userProfiles")
-        .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
+        .withIndex("by_identity_key", (q) => q.eq("identityKey", identityKey))
         .unique();
       authorized = profile !== null && (await canManageProperty(ctx, profile._id, property._id));
     }

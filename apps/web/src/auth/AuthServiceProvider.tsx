@@ -465,7 +465,7 @@ export function AuthServiceProvider({ children }: { children: ReactNode }) {
   if (convexClient === null) {
     if (!flags["auth.localLegacy.enabled"]) {
       throw new Error(
-        "Convex Auth must be configured. Legacy local authentication is disabled in this environment.",
+        "A production identity provider must be configured. Legacy local authentication is disabled in this environment.",
       );
     }
     return (

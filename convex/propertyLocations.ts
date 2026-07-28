@@ -1,6 +1,6 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { authenticatedIdentityKey } from "./lib/authorization";
 
 function validCoordinates(lat: number | undefined, lng: number | undefined) {
   return (
@@ -37,11 +37,11 @@ export const getForViewer = query({
     }
 
     let canManage = false;
-    const authUserId = await getAuthUserId(ctx);
-    if (authUserId) {
+    const identityKey = await authenticatedIdentityKey(ctx);
+    if (identityKey) {
       const profile = await ctx.db
         .query("userProfiles")
-        .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
+        .withIndex("by_identity_key", (q) => q.eq("identityKey", identityKey))
         .unique();
       if (profile) {
         if (profile.primaryRole === "admin" || profile.primaryRole === "moderator") {

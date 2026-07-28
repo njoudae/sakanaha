@@ -24,8 +24,10 @@ describe("initial administrator bootstrap", () => {
         updatedAt: now,
       });
       const ordinaryAuthUserId = await ctx.db.insert("users", { phone: "+966500000001" });
+      const ordinaryIdentityKey = "issuer.example|ordinary-subject";
       await ctx.db.insert("userProfiles", {
         authUserId: ordinaryAuthUserId,
+        identityKey: ordinaryIdentityKey,
         name: "Ordinary user",
         phone: "+966500000001",
         primaryRole: "user",
@@ -33,7 +35,7 @@ describe("initial administrator bootstrap", () => {
         createdAt: now,
         updatedAt: now,
       });
-      return { authUserId, profileId, ordinaryAuthUserId };
+      return { authUserId, profileId, ordinaryAuthUserId, ordinaryIdentityKey };
     });
 
     const first = await t.mutation(internal.bootstrap.initialAdmin, {
@@ -59,16 +61,31 @@ describe("initial administrator bootstrap", () => {
     expect(state.runs).toHaveLength(1);
 
     await expect(
-      t.withIdentity({ subject: setup.ordinaryAuthUserId }).query(api.admin.overview, {}),
+      t
+        .withIdentity({
+          subject: setup.ordinaryAuthUserId,
+          identityKey: setup.ordinaryIdentityKey,
+        })
+        .query(api.admin.overview, {}),
     ).rejects.toThrow("Administrator access required");
     await expect(
-      t.withIdentity({ subject: setup.authUserId }).query(api.admin.overview, {}),
+      t
+        .withIdentity({
+          subject: setup.authUserId,
+          identityKey: "issuer.example|initial-admin-subject",
+        })
+        .query(api.admin.overview, {}),
     ).resolves.toBeDefined();
     await expect(
-      t.withIdentity({ subject: setup.authUserId }).mutation(api.admin.updateUserStatus, {
-        userId: setup.profileId,
-        status: "suspended",
-      }),
+      t
+        .withIdentity({
+          subject: setup.authUserId,
+          identityKey: "issuer.example|initial-admin-subject",
+        })
+        .mutation(api.admin.updateUserStatus, {
+          userId: setup.profileId,
+          status: "suspended",
+        }),
     ).rejects.toThrow("cannot suspend their own account");
   });
 });

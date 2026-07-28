@@ -1,20 +1,6 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import type { MutationCtx } from "./_generated/server";
 import { mutation } from "./_generated/server";
-
-async function currentProfile(ctx: MutationCtx) {
-  const authUserId = await getAuthUserId(ctx);
-  if (authUserId === null) throw new Error("Authentication required.");
-  const profile = await ctx.db
-    .query("userProfiles")
-    .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
-    .unique();
-  if (profile === null || profile.status !== "active") {
-    throw new Error("An active user profile is required.");
-  }
-  return profile;
-}
+import { requireActiveProfile } from "./lib/authorization";
 
 function validCoordinates(lat: number | undefined, lng: number | undefined) {
   return (
@@ -38,7 +24,7 @@ export const submitPropertyForReview = mutation({
   args: { propertyId: v.id("properties") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const profile = await currentProfile(ctx);
+    const profile = await requireActiveProfile(ctx);
     const property = await ctx.db.get("properties", args.propertyId);
     if (property === null || property.deletedAt !== undefined) {
       throw new Error("Property not found.");
@@ -103,7 +89,7 @@ export const submitRoommateRequestForReview = mutation({
   args: { requestId: v.id("roommateRequests") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const profile = await currentProfile(ctx);
+    const profile = await requireActiveProfile(ctx);
     const request = await ctx.db.get("roommateRequests", args.requestId);
     if (request === null || request.deletedAt !== undefined) {
       throw new Error("Roommate request not found.");

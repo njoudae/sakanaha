@@ -15,15 +15,17 @@ async function createProfile(
   return await t.run(async (ctx) => {
     const now = Date.now();
     const authUserId = await ctx.db.insert("users", {});
+    const identityKey = `test-identity-${String(authUserId)}`;
     const profileId = await ctx.db.insert("userProfiles", {
       authUserId,
+      identityKey,
       name,
       primaryRole: role,
       status: "active",
       createdAt: now,
       updatedAt: now,
     });
-    return { authUserId, profileId };
+    return { authUserId, identityKey, profileId };
   });
 }
 
@@ -33,7 +35,9 @@ describe("admin dashboard API", () => {
     const user = await createProfile(t, "user", "Regular user");
     await expect(t.query(api.admin.overview, {})).rejects.toThrow("Authentication required");
     await expect(
-      t.withIdentity({ subject: user.authUserId }).query(api.admin.overview, {}),
+      t
+        .withIdentity({ subject: user.authUserId, identityKey: user.identityKey })
+        .query(api.admin.overview, {}),
     ).rejects.toThrow("Administrator access required");
   });
 
@@ -88,7 +92,10 @@ describe("admin dashboard API", () => {
       });
     });
 
-    const authenticated = t.withIdentity({ subject: admin.authUserId });
+    const authenticated = t.withIdentity({
+      subject: admin.authUserId,
+      identityKey: admin.identityKey,
+    });
     const overview = await authenticated.query(api.admin.overview, {});
     expect(overview.users.value).toBe(2);
     expect(overview.owners.value).toBe(1);
