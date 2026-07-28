@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { addRoommateRequest } from "../services/propertyService";
+import { useBusinessData } from "../data/BusinessDataContext";
 import type { Property, User, UserRole } from "@saknaha/shared-types";
 import type { RoommateLifestylePreferences } from "@saknaha/shared-types";
 import { formatRooms } from "@saknaha/utils/propertyFormat";
@@ -14,6 +14,7 @@ interface RoommateRequestFormProps {
 }
 
 export default function RoommateRequestForm({ property, user, onDone }: RoommateRequestFormProps) {
+  const business = useBusinessData();
   const [userType, setUserType] = useState<UserRole>(user?.role ?? "student");
   const [age, setAge] = useState("");
   const [organization, setOrganization] = useState(property.universityNearby);
@@ -29,11 +30,11 @@ export default function RoommateRequestForm({ property, user, onDone }: Roommate
   const availableRooms = Math.max(1, Math.min(totalRooms, property.maxResidents - 1));
   const canSubmit = Number(age) > 0 && organization.trim() && moveInDate.trim() && bio.trim();
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!canSubmit) return;
 
-    addRoommateRequest({
+    await business.createRoommateCard({
       propertyId: property.id,
       userId: user?.id ?? "guest-user",
       requesterName: user?.name,
@@ -45,6 +46,7 @@ export default function RoommateRequestForm({ property, user, onDone }: Roommate
       bio: bio.trim(),
       availableRooms,
       source: "saknaha_property",
+      linkedPropertyId: property.id,
       pricePerPerson: Math.ceil(property.price / Math.max(1, property.maxResidents)),
       preferences,
     });

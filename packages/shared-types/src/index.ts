@@ -8,6 +8,20 @@ export type PropertyStatus =
   | "archived"
   | "unpublished"
   | "paused";
+export type PropertyWorkflowStatus =
+  | "draft"
+  | "pending_payment"
+  | "paid"
+  | "pending_admin_review"
+  | "changes_requested"
+  | "rejected"
+  | "approved"
+  | "published"
+  | "archived"
+  | "suspended";
+export type RoommateCardWorkflowStatus =
+  "draft" | "pending_payment" | "paid" | "published" | "suspended" | "hidden" | "deleted";
+export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "cancelled";
 export type PublicationStatus =
   "draft" | "pending_review" | "approved" | "rejected" | "archived" | "unpublished";
 export type PropertyType = "شقة" | "دور" | "غرفة" | "عمارة" | "سكن مشترك";
@@ -61,7 +75,8 @@ export interface User {
   email?: string;
   phone: string;
   role: UserRole;
-  platformRole?: "admin" | "support" | "moderator" | "owner" | "user" | "service_provider";
+  platformRole?:
+    "admin" | "support" | "moderator" | "real_estate_agent" | "owner" | "user" | "service_provider";
   city: string;
   monthlyBudget: number;
   acceptsRoommate: boolean;
@@ -132,6 +147,8 @@ export interface Property {
   submittedAt?: string;
   reviewedAt?: string;
   paymentCompleted?: boolean;
+  workflowStatus?: PropertyWorkflowStatus;
+  paymentStatus?: PaymentStatus;
   distanceText: string;
   timeText: string;
   createdAt: string;
@@ -173,6 +190,7 @@ export interface RoommatePreference {
 export interface RoommateRequest {
   id: string;
   propertyId: string;
+  linkedPropertyId?: string;
   userId: string;
   requesterName?: string;
   userType: UserRole;
@@ -196,6 +214,16 @@ export interface RoommateRequest {
   rejectionReason?: string;
   submittedAt?: string;
   reviewedAt?: string;
+  workflowStatus?: RoommateCardWorkflowStatus;
+  paymentStatus?: PaymentStatus;
+  externalHousing?: {
+    city: string;
+    district: string;
+    approximateLocation?: string;
+    nearbyLandmarks?: string[];
+    approximateLat?: number;
+    approximateLng?: number;
+  };
   createdAt: string;
 }
 

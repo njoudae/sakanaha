@@ -7,7 +7,7 @@ import {
 
 export interface RoommateListing {
   request: RoommateRequest;
-  property: Property;
+  property: Property | null;
 }
 
 interface RoommateListingCardProps {
@@ -16,19 +16,20 @@ interface RoommateListingCardProps {
   featured?: boolean;
 }
 
-function propertyTypeLabel(property: Property) {
-  return property.propertyType;
+function propertyTypeLabel(property: Property | null) {
+  return property?.propertyType ?? "سكن خارجي";
 }
 
-function housingTypeLabel(property: Property) {
+function housingTypeLabel(property: Property | null) {
+  if (!property) return "سكن خارجي";
   if (property.classification === "نسائي بالكامل") return "نسائي بالكامل";
   if (property.classification === "دور نسائي داخل سكن عوائل") return "دور نسائي";
   if (property.classification === "عوائل") return "عوائل";
   return "متاح للجميع";
 }
 
-function nearbyServiceLabel(property: Property) {
-  return property.services.length > 0 ? "خدمات قريبة" : "بدون خدمات مضافة";
+function nearbyServiceLabel(property: Property | null) {
+  return property?.services.length ? "خدمات قريبة" : "بدون خدمات مضافة";
 }
 
 export default function RoommateListingCard({
@@ -63,7 +64,8 @@ export default function RoommateListingCard({
           </h3>
           <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-stone-500">
             <MapPin size={14} aria-hidden="true" />
-            {property.city}، {property.neighborhood}
+            {property?.city ?? request.externalHousing?.city ?? request.city ?? ""}،{" "}
+            {property?.neighborhood ?? request.externalHousing?.district ?? request.district ?? ""}
           </p>
         </div>
       </div>

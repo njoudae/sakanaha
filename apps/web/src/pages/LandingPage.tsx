@@ -1,12 +1,8 @@
 import DiscoveryCarousel from "../components/DiscoveryCarousel";
 import PropertyCard from "../components/PropertyCard";
 import RoommateListingCard from "../components/RoommateListingCard";
-import {
-  getPublishedProperties,
-  getPropertyById,
-  getRoommateRequests,
-} from "../services/propertyService";
-import type { Property, RoommateRequest } from "@saknaha/shared-types";
+import { useBusinessData } from "../data/BusinessDataContext";
+import type { Property } from "@saknaha/shared-types";
 import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { cityNames } from "@saknaha/constants/cities";
@@ -21,17 +17,13 @@ interface LandingPageProps {
   onRoommateDetails: (requestId: string) => void;
 }
 
-interface RoommateListing {
-  request: RoommateRequest;
-  property: Property;
-}
-
 export default function LandingPage({
   onHousing,
   onProperty,
   onRoommates,
   onRoommateDetails,
 }: LandingPageProps) {
+  const business = useBusinessData();
   const [activeSection, setActiveSection] = useState<"all" | "housing" | "roommates">("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedCity, setSelectedCity] = useState("all");
@@ -39,14 +31,19 @@ export default function LandingPage({
     if (selectedCity === "all") return true;
     return property.city === selectedCity;
   };
-  const housing = getPublishedProperties().filter(matchesLocation).slice(0, 10);
-  const roommates = getRoommateRequests()
+  const housing = business.properties.filter(matchesLocation).slice(0, 10);
+  const roommates = business.roommateRequests
     .map((request) => {
-      const property = getPropertyById(request.propertyId);
-      return property ? { request, property } : null;
+      const property =
+        business.properties.find((item) => item.id === request.linkedPropertyId) ?? null;
+      return { request, property };
     })
-    .filter((listing): listing is RoommateListing =>
-      Boolean(listing && matchesLocation(listing.property)),
+    .filter((listing) =>
+      listing.property
+        ? matchesLocation(listing.property)
+        : selectedCity === "all" ||
+          listing.request.externalHousing?.city === selectedCity ||
+          listing.request.city === selectedCity,
     );
   const hasLocationFilter = selectedCity !== "all";
 
@@ -140,7 +137,7 @@ export default function LandingPage({
             title="جميع خيارات السكن"
             items={housing}
             onTitleClick={onHousing}
-            itemClassName="h-[520px] w-[88vw] max-w-[390px] shrink-0 snap-start sm:w-[360px]"
+            itemClassName="h-[468px] w-[82vw] max-w-[340px] shrink-0 snap-start sm:w-[330px]"
             renderItem={(property) => (
               <PropertyCard
                 property={property}

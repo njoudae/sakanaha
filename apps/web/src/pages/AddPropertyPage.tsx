@@ -43,7 +43,7 @@ import {
   propertyFeatureOptions,
   rentIncludedOptions,
 } from "../services/propertyAmenities";
-import { saveProperty } from "../services/propertyService";
+import { useBusinessData } from "../data/BusinessDataContext";
 
 const steps = ["الموقع", "معلومات السكن", "السعر والصور", "المراجعة والنشر"];
 
@@ -69,6 +69,7 @@ interface AddPropertyPageProps {
 }
 
 export default function AddPropertyPage({ owner, editing, onSaved, onBack }: AddPropertyPageProps) {
+  const business = useBusinessData();
   const mediaService = useMediaService();
   const [step, setStep] = useState(0);
   const [property, setProperty] = useState<Property>(
@@ -319,9 +320,9 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
     }
   }
 
-  function publish(publicationStatus: "pending_review" | "draft") {
+  async function publish(publicationStatus: "pending_review" | "draft") {
     const submittedAt = new Date().toISOString();
-    const savedProperty = saveProperty({
+    const propertyId = await business.saveProperty({
       ...property,
       status: publicationStatus,
       publicationStatus,
@@ -329,13 +330,16 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
       submittedAt: publicationStatus === "pending_review" ? submittedAt : property.submittedAt,
       rejectionReason: undefined,
     });
-    window.alert(
-      publicationStatus === "draft"
-        ? "تم حفظ المسودة في نسخة الواجهات."
-        : savedProperty.publicationStatus === "approved"
-          ? "تمت الموافقة على العقار ونشره مباشرة. سيظهر الآن في الصفحة الرئيسية."
-          : "اكتملت معاينة الدفع بقيمة 150 ريال وتم إرسال العقار للمراجعة.",
-    );
+    if (publicationStatus === "pending_review") {
+      try {
+        await business.submitProperty(propertyId);
+        window.alert("تم إرسال العقار للمراجعة.");
+      } catch {
+        window.alert("تم حفظ العقار في Convex. يلزم تأكيد الدفع قبل إرساله للمراجعة.");
+      }
+    } else {
+      window.alert("تم حفظ المسودة في Convex.");
+    }
     onSaved();
   }
 
@@ -372,12 +376,16 @@ export default function AddPropertyPage({ owner, editing, onSaved, onBack }: Add
                 <span className="text-stone-500 line-through decoration-2">300 ريال</span>
                 <span>150 ريال بعد الخصم</span>
               </p>
-              <button className="secondary-button" onClick={() => publish("draft")} type="button">
+              <button
+                className="secondary-button"
+                onClick={() => void publish("draft")}
+                type="button"
+              >
                 معاينة المسودة
               </button>
               <button
                 className="primary-button"
-                onClick={() => publish("pending_review")}
+                onClick={() => void publish("pending_review")}
                 type="button"
               >
                 الدفع وإرسال للمعاينة

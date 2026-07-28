@@ -2,11 +2,7 @@ import { ArrowRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import PropertyCard from "../components/PropertyCard";
 import { cityNames } from "@saknaha/constants/cities";
-import {
-  getOwnerSubmittedPublishedProperties,
-  isFavoriteProperty,
-  toggleFavoriteProperty,
-} from "../services/propertyService";
+import { useBusinessData } from "../data/BusinessDataContext";
 import type { Property, User } from "@saknaha/shared-types";
 import { absoluteAppUrl, propertyPath } from "../utils/routes";
 
@@ -25,12 +21,11 @@ export default function CityResultsPage({
   onCity,
   onProperty,
 }: CityResultsPageProps) {
-  const userId = user?.id ?? "guest-user";
-  const [favoriteVersion, setFavoriteVersion] = useState(0);
+  const business = useBusinessData();
   const [notice, setNotice] = useState("");
   const properties = useMemo(
-    () => getOwnerSubmittedPublishedProperties().filter((property) => property.city === cityName),
-    [cityName, favoriteVersion],
+    () => business.properties.filter((property) => property.city === cityName),
+    [business.properties, cityName],
   );
 
   async function shareProperty(property: Property) {
@@ -53,8 +48,9 @@ export default function CityResultsPage({
   }
 
   function toggleFavorite(property: Property) {
-    toggleFavoriteProperty(property, userId);
-    setFavoriteVersion((value) => value + 1);
+    if (user) {
+      void business.setFavorite(property.id, !business.favoritePropertyIds.includes(property.id));
+    }
     setNotice("تم تحديث المفضلة. سنستخدمها لاحقًا لفهم الاهتمام حسب المدينة.");
   }
 
@@ -120,7 +116,7 @@ export default function CityResultsPage({
                 key={property.id}
                 property={property}
                 onView={() => onProperty(property.id)}
-                isFavorite={isFavoriteProperty(property.id, userId)}
+                isFavorite={business.favoritePropertyIds.includes(property.id)}
                 onFavorite={toggleFavorite}
                 onShare={shareProperty}
               />

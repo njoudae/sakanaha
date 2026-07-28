@@ -11,6 +11,7 @@ import {
   type SmsProvider,
 } from "@saknaha/providers";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
 import { isWithinQuietHours, notificationExternalUrl } from "./notificationSupport";
 
@@ -138,9 +139,12 @@ function deliveryError(error: unknown) {
 
 export const processDue = internalAction({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ processed: number; considered: number }> => {
     const now = Date.now();
-    const deliveryIds = await ctx.runQuery(internal.notificationState.due, { now });
+    const deliveryIds: Id<"notificationDeliveries">[] = await ctx.runQuery(
+      internal.notificationState.due,
+      { now },
+    );
     let processed = 0;
     for (const deliveryId of deliveryIds) {
       const claimed = await ctx.runMutation(internal.notificationState.claim, {

@@ -2,12 +2,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cityNames } from "@saknaha/constants/cities";
 import RoommateListingCard from "../components/RoommateListingCard";
-import {
-  getPropertyById,
-  getPublishedProperties,
-  getRoommateRequests,
-} from "../services/propertyService";
-import type { Property, RoommateRequest } from "@saknaha/shared-types";
+import { useBusinessData } from "../data/BusinessDataContext";
 
 interface RoommatesPageProps {
   onDetails: (requestId: string) => void;
@@ -17,11 +12,6 @@ interface RoommatesPageProps {
   initialCity?: string;
 }
 
-interface RoommateListing {
-  request: RoommateRequest;
-  property: Property;
-}
-
 export default function RoommatesPage({
   onDetails,
   onProperty,
@@ -29,20 +19,23 @@ export default function RoommatesPage({
   onHome,
   initialCity = "all",
 }: RoommatesPageProps) {
+  const business = useBusinessData();
   const [city, setCity] = useState(initialCity);
 
   const listings = useMemo(() => {
-    return getRoommateRequests()
+    return business.roommateRequests
       .map((request) => {
-        const property = getPropertyById(request.propertyId);
-        return property ? { request, property } : null;
+        const property =
+          business.properties.find((item) => item.id === request.linkedPropertyId) ?? null;
+        return { request, property };
       })
-      .filter((listing): listing is RoommateListing => {
-        if (!listing) return false;
-        if (city !== "all" && listing.property.city !== city) return false;
+      .filter((listing) => {
+        const listingCity =
+          listing.property?.city ?? listing.request.externalHousing?.city ?? listing.request.city;
+        if (city !== "all" && listingCity !== city) return false;
         return true;
       });
-  }, [city]);
+  }, [business.properties, business.roommateRequests, city]);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-12" dir="rtl">
@@ -109,28 +102,26 @@ export default function RoommatesPage({
           </button>
         </div>
         <div className="flex gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {getPublishedProperties()
-            .slice(0, 8)
-            .map((property) => (
-              <button
-                key={property.id}
-                className="w-72 shrink-0 rounded-2xl border border-stone-200 bg-white p-3 text-right shadow-sm transition hover:border-berry"
-                onClick={() => onProperty(property.id)}
-                type="button"
-              >
-                <img
-                  src={property.images[0]}
-                  alt={property.title}
-                  className="h-32 w-full rounded-xl object-cover"
-                />
-                <h3 className="mt-3 line-clamp-1 text-lg font-black text-ink">
-                  {property.city}، {property.neighborhood}
-                </h3>
-                <p className="mt-2 font-black text-ink">
-                  {property.price.toLocaleString("ar-SA")} ر.س / شهر
-                </p>
-              </button>
-            ))}
+          {business.properties.slice(0, 8).map((property) => (
+            <button
+              key={property.id}
+              className="w-72 shrink-0 rounded-2xl border border-stone-200 bg-white p-3 text-right shadow-sm transition hover:border-berry"
+              onClick={() => onProperty(property.id)}
+              type="button"
+            >
+              <img
+                src={property.images[0]}
+                alt={property.title}
+                className="h-32 w-full rounded-xl object-cover"
+              />
+              <h3 className="mt-3 line-clamp-1 text-lg font-black text-ink">
+                {property.city}، {property.neighborhood}
+              </h3>
+              <p className="mt-2 font-black text-ink">
+                {property.price.toLocaleString("ar-SA")} ر.س / شهر
+              </p>
+            </button>
+          ))}
         </div>
       </section>
     </main>

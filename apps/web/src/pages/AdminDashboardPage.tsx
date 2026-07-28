@@ -27,10 +27,20 @@ const roleLabels: Record<PlatformRole, string> = {
   admin: "مدير",
   support: "دعم",
   moderator: "مشرف",
+  real_estate_agent: "وسيط عقاري",
   owner: "مالك",
   user: "مستخدم",
   service_provider: "مزود خدمة",
 };
+const visibleRoleOptions: PlatformRole[] = [
+  "admin",
+  "moderator",
+  "support",
+  "real_estate_agent",
+  "user",
+  "owner",
+  "service_provider",
+];
 
 const statusLabels: Record<ProfileStatus, string> = {
   active: "نشط",
@@ -64,6 +74,18 @@ export default function AdminDashboardPage() {
       setMessage("تم تحديث حالة المستخدم.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "تعذر تحديث المستخدم.");
+    }
+  }
+
+  async function updateRole(userId: string, role: PlatformRole) {
+    const reason = window.prompt("اكتب سبب تغيير صلاحية المستخدم:");
+    if (!reason?.trim()) return;
+    setMessage("");
+    try {
+      await admin.updateUserRole(userId, role, reason);
+      setMessage("تم تحديث صلاحية المستخدم.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "تعذر تحديث الصلاحية.");
     }
   }
 
@@ -162,6 +184,12 @@ export default function AdminDashboardPage() {
               label="عقارات بانتظار الاعتماد"
               value={countLabel(overview?.pendingPropertyApprovals)}
             />
+            <MetricCard
+              icon={ClipboardCheck}
+              label="الحجوزات"
+              value={countLabel(overview?.bookings)}
+            />
+            <MetricCard icon={BarChart3} label="المدفوعات" value={countLabel(overview?.payments)} />
           </section>
 
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="حالات المراجعة">
@@ -225,9 +253,9 @@ export default function AdminDashboardPage() {
                   aria-label="تصفية حسب الدور"
                 >
                   <option value="">كل الأدوار</option>
-                  {Object.entries(roleLabels).map(([value, label]) => (
+                  {visibleRoleOptions.map((value) => (
                     <option key={value} value={value}>
-                      {label}
+                      {roleLabels[value]}
                     </option>
                   ))}
                 </select>
@@ -263,7 +291,22 @@ export default function AdminDashboardPage() {
                   {admin.users.map((item) => (
                     <tr className="border-b border-stone-100" key={item.id}>
                       <td className="p-3 font-black text-ink">{item.name}</td>
-                      <td className="p-3">{roleLabels[item.role]}</td>
+                      <td className="p-3">
+                        <select
+                          className="field field-select min-w-36"
+                          value={item.role}
+                          onChange={(event) =>
+                            void updateRole(item.id, event.target.value as PlatformRole)
+                          }
+                          aria-label={`تغيير صلاحية ${item.name}`}
+                        >
+                          {visibleRoleOptions.map((role) => (
+                            <option value={role} key={role}>
+                              {roleLabels[role]}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
                       <td className="p-3">{item.city || "—"}</td>
                       <td className="p-3">{statusLabels[item.status]}</td>
                       <td className="p-3">
@@ -284,6 +327,72 @@ export default function AdminDashboardPage() {
                 </tbody>
               </table>
               {admin.users.length === 0 ? <EmptyState label="لا توجد نتائج للمستخدمين." /> : null}
+            </div>
+          </section>
+          <section className="panel" id="admin-agents">
+            <h2 className="text-2xl font-black text-ink">إدارة الوسطاء العقاريين</h2>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[760px] text-right text-sm">
+                <thead className="border-b border-stone-200 text-stone-500">
+                  <tr>
+                    <th className="p-3">الوسيط</th>
+                    <th className="p-3">رقم التواصل</th>
+                    <th className="p-3">التحقق</th>
+                    <th className="p-3">الحالة</th>
+                    <th className="p-3">الإجراء</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {admin.agents.map((agent) => (
+                    <tr className="border-b border-stone-100" key={agent._id}>
+                      <td className="p-3 font-black">{agent.fullName}</td>
+                      <td className="p-3">{agent.phone}</td>
+                      <td className="p-3">{agent.verificationStatus}</td>
+                      <td className="p-3">{agent.status}</td>
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <button
+                            className="primary-button !min-h-10 !px-3"
+                            type="button"
+                            onClick={() =>
+                              void admin.moderateAgent(
+                                agent._id,
+                                "verified",
+                                "active",
+                                "اعتماد الوسيط من لوحة الإدارة",
+                              )
+                            }
+                          >
+                            اعتماد
+                          </button>
+                          <button
+                            className="danger-button !min-h-10 !px-3"
+                            type="button"
+                            onClick={() => {
+                              const reason = window.prompt("سبب إيقاف الوسيط:");
+                              if (reason?.trim()) {
+                                void admin.moderateAgent(
+                                  agent._id,
+                                  agent.verificationStatus === "pending" ||
+                                    agent.verificationStatus === "verified" ||
+                                    agent.verificationStatus === "rejected"
+                                    ? agent.verificationStatus
+                                    : "unverified",
+                                  "suspended",
+                                  reason,
+                                );
+                              }
+                            }}
+                          >
+                            إيقاف
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {admin.agents.length === 0 ? <EmptyState label="لا يوجد وسطاء." /> : null}
             </div>
           </section>
 
@@ -405,6 +514,22 @@ export default function AdminDashboardPage() {
                             className="danger-button !min-h-10 !px-3"
                             type="button"
                             onClick={() => {
+                              const reason = window.prompt("سبب تعليق العقار:");
+                              if (reason?.trim()) {
+                                void admin.setPropertyOperationalStatus(
+                                  item.id,
+                                  "suspended",
+                                  reason,
+                                );
+                              }
+                            }}
+                          >
+                            تعليق
+                          </button>
+                          <button
+                            className="danger-button !min-h-10 !px-3"
+                            type="button"
+                            onClick={() => {
                               if (window.confirm("حذف العقار نهائيًا من قائمة الإدارة؟")) {
                                 void admin.deleteProperty(item.id);
                               }
@@ -490,9 +615,37 @@ export default function AdminDashboardPage() {
                           <button
                             className="secondary-button !min-h-10 !px-3"
                             type="button"
+                            onClick={() => {
+                              const reason = window.prompt("اكتب التعديلات المطلوبة:");
+                              if (reason?.trim()) {
+                                void moderateRoommate(item.id, "needs_review", reason);
+                              }
+                            }}
+                          >
+                            طلب تعديلات
+                          </button>
+                          <button
+                            className="secondary-button !min-h-10 !px-3"
+                            type="button"
                             onClick={() => void moderateRoommate(item.id, "archived")}
                           >
                             أرشفة
+                          </button>
+                          <button
+                            className="danger-button !min-h-10 !px-3"
+                            type="button"
+                            onClick={() => {
+                              const reason = window.prompt("سبب تعليق البطاقة:");
+                              if (reason?.trim()) {
+                                void admin.setRoommateOperationalStatus(
+                                  item.id,
+                                  "suspended",
+                                  reason,
+                                );
+                              }
+                            }}
+                          >
+                            تعليق
                           </button>
                           <button
                             className="danger-button !min-h-10 !px-3"
@@ -536,6 +689,53 @@ export default function AdminDashboardPage() {
                 تسجل جميع قرارات الاعتماد والرفض والأرشفة والحذف في سجل التدقيق.
               </p>
             </article>
+          </section>
+          <section className="grid gap-5 xl:grid-cols-2" id="admin-finance">
+            <article className="panel">
+              <h2 className="text-xl font-black text-ink">الحجوزات الأخيرة</h2>
+              <div className="mt-3 grid gap-2">
+                {admin.bookings.slice(0, 20).map((booking) => (
+                  <div className="rounded-xl border border-stone-200 p-3" key={booking._id}>
+                    <p className="font-black">{booking.status}</p>
+                    <p className="text-sm text-stone-600">
+                      {booking.amount.toLocaleString("ar-SA")} {booking.currency} —{" "}
+                      {booking.startDate}
+                    </p>
+                  </div>
+                ))}
+                {admin.bookings.length === 0 ? <EmptyState label="لا توجد حجوزات." /> : null}
+              </div>
+            </article>
+            <article className="panel">
+              <h2 className="text-xl font-black text-ink">المدفوعات الأخيرة</h2>
+              <div className="mt-3 grid gap-2">
+                {admin.payments.slice(0, 20).map((payment) => (
+                  <div className="rounded-xl border border-stone-200 p-3" key={payment._id}>
+                    <p className="font-black">
+                      {payment.entityType} — {payment.status}
+                    </p>
+                    <p className="text-sm text-stone-600">
+                      {payment.amount.toLocaleString("ar-SA")} {payment.currency}
+                    </p>
+                  </div>
+                ))}
+                {admin.payments.length === 0 ? <EmptyState label="لا توجد مدفوعات." /> : null}
+              </div>
+            </article>
+          </section>
+          <section className="panel" id="admin-audit">
+            <h2 className="text-xl font-black text-ink">سجل التدقيق</h2>
+            <div className="mt-3 grid gap-2">
+              {admin.auditEvents.slice(0, 30).map((event) => (
+                <div className="rounded-xl border border-stone-200 p-3" key={event._id}>
+                  <p className="font-black">{event.action}</p>
+                  <p className="text-sm text-stone-600">
+                    {event.entityType ?? "منصة"} — {event.reason ?? "بدون ملاحظة"}
+                  </p>
+                </div>
+              ))}
+              {admin.auditEvents.length === 0 ? <EmptyState label="لا توجد أحداث تدقيق." /> : null}
+            </div>
           </section>
         </div>
       )}

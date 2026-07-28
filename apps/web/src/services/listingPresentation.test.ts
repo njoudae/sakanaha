@@ -10,7 +10,7 @@ const property: Property = {
   id: "property-1",
   ownerId: "owner-1",
   ownerName: "مالكة السكن",
-  ownerPhone: "0500000000",
+  ownerPhone: "test-owner-phone",
   title: "غرفة قريبة من الجامعة",
   propertyLicenseNumber: "license-1",
   city: "أبها",

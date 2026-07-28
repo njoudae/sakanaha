@@ -3,11 +3,8 @@
 ## Development admin
 
 - Use the normal “باحثة عن سكن / شريكة سكن” phone login.
-- Development admin phone: `0582968141`.
 - The account is created locally with `platformRole: "admin"` and opens `/admin` automatically.
 - This compatibility account exists only when the local-storage authentication adapter is active.
-- It is enabled automatically by the Vite development server. For an isolated non-production preview, set `VITE_ENABLE_DEVELOPMENT_ADMIN=true`.
-- Keep `VITE_ENABLE_DEVELOPMENT_ADMIN=false` in staging and production.
 
 For a Convex deployment, provision an authenticated user profile with `primaryRole: "admin"` through the deployment’s controlled operator process. Never expose development provisioning in production.
 

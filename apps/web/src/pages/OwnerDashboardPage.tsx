@@ -1,6 +1,6 @@
 import { BarChart3, Building2, FilePenLine, LogOut, Plus, Settings } from "lucide-react";
 import PropertyCard from "../components/PropertyCard";
-import { getOwnerInterests, getOwnerProperties } from "../services/propertyService";
+import { useBusinessData } from "../data/BusinessDataContext";
 import type { Owner, Property } from "@saknaha/shared-types";
 
 interface OwnerDashboardPageProps {
@@ -20,8 +20,9 @@ export default function OwnerDashboardPage({
   onView,
   onLogout,
 }: OwnerDashboardPageProps) {
-  const properties = getOwnerProperties(owner.id);
-  const interests = getOwnerInterests(owner.id);
+  const business = useBusinessData();
+  const properties = business.ownerProperties;
+  const interests = business.activity.interests;
 
   return (
     <main className="page-shell" dir="rtl" id="owner-dashboard-overview">

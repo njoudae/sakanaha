@@ -1,6 +1,6 @@
 import type { University, UniversityLocation } from "@saknaha/shared-types";
 
-export const mockUniversitiesCatalog: University[] = [
+export const universityCatalog: University[] = [
   { id: "kku", name: "جامعة الملك خالد", region: "منطقة عسير", city: "أبها", active: true },
   {
     id: "ksu",
@@ -53,7 +53,7 @@ export const mockUniversitiesCatalog: University[] = [
   },
 ];
 
-export const mockUniversities: UniversityLocation[] = [
+export const universityBranches: UniversityLocation[] = [
   branch(
     "kku-quraiger",
     "kku",

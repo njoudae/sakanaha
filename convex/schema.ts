@@ -6,6 +6,9 @@ import {
   deliveryStatus,
   distanceUnit,
   featureFlagScope,
+  identityProviderLinkStatus,
+  identitySessionStatus,
+  identityStatus,
   interestMode,
   interestStatus,
   jobStatus,
@@ -24,15 +27,20 @@ import {
   otpChannel,
   otpStatus,
   ownerStatus,
+  bookingStatus,
+  paymentEntityType,
+  paymentStatus,
   platformRole,
   profileStatus,
   providerCapability,
   providerOperationStatus,
   publicationStatus,
+  propertyWorkflowStatus,
   quietHours,
   rateLimitScope,
   roleAssignmentStatus,
   roleScope,
+  roommateCardWorkflowStatus,
   scanStatus,
   servicePricingUnit,
   serviceProviderStatus,
@@ -46,6 +54,12 @@ import {
 export default defineSchema(
   {
     ...authTables,
+
+    publicIdCounters: defineTable({
+      key: v.string(),
+      value: v.number(),
+      updatedAt: v.number(),
+    }).index("by_key", ["key"]),
 
     universities: defineTable({
       externalId: v.string(),
@@ -80,15 +94,39 @@ export default defineSchema(
     userProfiles: defineTable({
       authUserId: v.optional(v.id("users")),
       authSubject: v.optional(v.string()),
+      identityKey: v.optional(v.string()),
       legacyUserId: v.optional(v.string()),
+      publicCode: v.optional(v.string()),
       name: v.string(),
       email: v.optional(v.string()),
       phone: v.optional(v.string()),
       primaryRole: platformRole,
       userType: v.optional(userType),
       city: v.optional(v.string()),
+      district: v.optional(v.string()),
       monthlyBudget: v.optional(v.number()),
       acceptsRoommate: v.optional(v.boolean()),
+      roommatePreferences: v.optional(
+        v.object({
+          smoking: v.union(v.literal("yes"), v.literal("no")),
+          guests: v.union(
+            v.literal("never"),
+            v.literal("occasionally"),
+            v.literal("frequently"),
+            v.literal("no_preference"),
+          ),
+          sleep: v.union(v.literal("early"), v.literal("flexible"), v.literal("late")),
+          cleanliness: v.union(
+            v.literal("very_tidy"),
+            v.literal("average"),
+            v.literal("no_preference"),
+          ),
+          pets: v.union(v.literal("allowed"), v.literal("not_allowed")),
+          cooking: v.union(v.literal("frequently"), v.literal("occasionally"), v.literal("rarely")),
+          occupation: v.union(v.literal("student"), v.literal("employee"), v.literal("both")),
+          noise: v.union(v.literal("quiet"), v.literal("moderate"), v.literal("no_preference")),
+        }),
+      ),
       selectedUniversityBranchId: v.optional(v.id("universityBranches")),
       status: profileStatus,
       createdAt: v.number(),
@@ -97,11 +135,56 @@ export default defineSchema(
     })
       .index("by_auth_user", ["authUserId"])
       .index("by_auth_subject", ["authSubject"])
+      .index("by_identity_key", ["identityKey"])
       .index("by_legacy_user", ["legacyUserId"])
+      .index("by_public_code", ["publicCode"])
       .index("by_phone", ["phone"])
       .index("by_email", ["email"])
       .index("by_primary_role", ["primaryRole"])
       .index("by_status", ["status"]),
+
+    identities: defineTable({
+      identityKey: v.string(),
+      userProfileId: v.id("userProfiles"),
+      status: identityStatus,
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      revokedAt: v.optional(v.number()),
+    })
+      .index("by_identity_key", ["identityKey"])
+      .index("by_user_profile", ["userProfileId"])
+      .index("by_status", ["status"]),
+
+    identityProviderLinks: defineTable({
+      identityId: v.id("identities"),
+      providerKey: v.string(),
+      providerSubjectHash: v.string(),
+      status: identityProviderLinkStatus,
+      verifiedAt: v.number(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      revokedAt: v.optional(v.number()),
+    })
+      .index("by_provider_and_subject_hash", ["providerKey", "providerSubjectHash"])
+      .index("by_identity_and_provider", ["identityId", "providerKey"])
+      .index("by_identity_and_status", ["identityId", "status"]),
+
+    identitySessions: defineTable({
+      identityId: v.id("identities"),
+      tokenHash: v.string(),
+      status: identitySessionStatus,
+      expiresAt: v.number(),
+      refreshExpiresAt: v.number(),
+      lastValidatedAt: v.optional(v.number()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      revokedAt: v.optional(v.number()),
+      replacedBySessionId: v.optional(v.id("identitySessions")),
+    })
+      .index("by_token_hash", ["tokenHash"])
+      .index("by_identity_and_status", ["identityId", "status"])
+      .index("by_status_and_expires_at", ["status", "expiresAt"])
+      .index("by_status_and_refresh_expires_at", ["status", "refreshExpiresAt"]),
 
     ownerProfiles: defineTable({
       userId: v.id("userProfiles"),
@@ -195,6 +278,7 @@ export default defineSchema(
             v.literal("cleaning_worker"),
             v.literal("security_cameras"),
             v.literal("elevator"),
+            v.literal("self_check_in"),
           ),
         ),
       ),
@@ -205,6 +289,13 @@ export default defineSchema(
             v.literal("grocery"),
             v.literal("supermarket"),
             v.literal("malls"),
+            v.literal("food_supply"),
+            v.literal("mall"),
+            v.literal("salon"),
+            v.literal("bus_station"),
+            v.literal("train_station"),
+            v.literal("pharmacy"),
+            v.literal("clinics"),
           ),
         ),
       ),
@@ -245,6 +336,10 @@ export default defineSchema(
       reviewedAt: v.optional(v.number()),
       reviewedByUserId: v.optional(v.id("userProfiles")),
       paymentCompleted: v.optional(v.boolean()),
+      workflowStatus: v.optional(propertyWorkflowStatus),
+      paymentStatus: v.optional(paymentStatus),
+      contentVersion: v.optional(v.number()),
+      reviewedContentVersion: v.optional(v.number()),
       searchText: v.string(),
       distanceText: v.optional(v.string()),
       timeText: v.optional(v.string()),
@@ -259,6 +354,8 @@ export default defineSchema(
       .index("by_status_city_published", ["status", "city", "publishedAt"])
       .index("by_moderation_status", ["moderationStatus"])
       .index("by_publication_status", ["publicationStatus"])
+      .index("by_workflow_status", ["workflowStatus"])
+      .index("by_owner_and_workflow_status", ["ownerProfileId", "workflowStatus"])
       .index("by_legacy_property", ["legacyPropertyId"])
       .index("by_geohash_status", ["geohash", "status"])
       .searchIndex("search_properties", {
@@ -267,7 +364,8 @@ export default defineSchema(
       }),
 
     propertyServices: defineTable({
-      propertyId: v.id("properties"),
+      propertyId: v.optional(v.id("properties")),
+      linkedPropertyId: v.optional(v.id("properties")),
       legacyServiceId: v.optional(v.string()),
       type: v.string(),
       name: v.string(),
@@ -399,7 +497,9 @@ export default defineSchema(
       .index("by_legacy_preference", ["legacyPreferenceId"]),
 
     roommateRequests: defineTable({
-      propertyId: v.id("properties"),
+      // Deprecated propertyId remains during migration; new cards use linkedPropertyId.
+      propertyId: v.optional(v.id("properties")),
+      linkedPropertyId: v.optional(v.id("properties")),
       userId: v.id("userProfiles"),
       userType,
       age: v.number(),
@@ -408,6 +508,29 @@ export default defineSchema(
       moveInDate: v.string(),
       bio: v.string(),
       availableRooms: v.number(),
+      source: v.optional(v.union(v.literal("saknaha_property"), v.literal("external_property"))),
+      pricePerPerson: v.optional(v.number()),
+      preferences: v.optional(
+        v.object({
+          smoking: v.union(v.literal("yes"), v.literal("no")),
+          guests: v.union(
+            v.literal("never"),
+            v.literal("occasionally"),
+            v.literal("frequently"),
+            v.literal("no_preference"),
+          ),
+          sleep: v.union(v.literal("early"), v.literal("flexible"), v.literal("late")),
+          cleanliness: v.union(
+            v.literal("very_tidy"),
+            v.literal("average"),
+            v.literal("no_preference"),
+          ),
+          pets: v.union(v.literal("allowed"), v.literal("not_allowed")),
+          cooking: v.union(v.literal("frequently"), v.literal("occasionally"), v.literal("rarely")),
+          occupation: v.union(v.literal("student"), v.literal("employee"), v.literal("both")),
+          noise: v.union(v.literal("quiet"), v.literal("moderate"), v.literal("no_preference")),
+        }),
+      ),
       region: v.optional(v.string()),
       city: v.optional(v.string()),
       district: v.optional(v.string()),
@@ -415,6 +538,18 @@ export default defineSchema(
       universityBranchId: v.optional(v.id("universityBranches")),
       approximateLat: v.optional(v.number()),
       approximateLng: v.optional(v.number()),
+      externalHousing: v.optional(
+        v.object({
+          city: v.string(),
+          district: v.string(),
+          approximateLocation: v.optional(v.string()),
+          nearbyLandmarks: v.optional(v.array(v.string())),
+          approximateLat: v.optional(v.number()),
+          approximateLng: v.optional(v.number()),
+        }),
+      ),
+      workflowStatus: v.optional(roommateCardWorkflowStatus),
+      paymentStatus: v.optional(paymentStatus),
       publicationStatus: v.optional(publicationStatus),
       rejectionReason: v.optional(v.string()),
       submittedAt: v.optional(v.number()),
@@ -437,7 +572,76 @@ export default defineSchema(
       .index("by_status_created", ["status", "createdAt"])
       .index("by_moderation_status", ["moderationStatus"])
       .index("by_publication_status", ["publicationStatus"])
+      .index("by_workflow_status", ["workflowStatus"])
+      .index("by_user_and_workflow_status", ["userId", "workflowStatus"])
+      .index("by_linked_property", ["linkedPropertyId"])
       .index("by_legacy_request", ["legacyRequestId"]),
+
+    roommateInterests: defineTable({
+      requesterUserId: v.id("userProfiles"),
+      roommateRequestId: v.id("roommateRequests"),
+      status: v.union(v.literal("registered"), v.literal("withdrawn")),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_requester_and_request", ["requesterUserId", "roommateRequestId"])
+      .index("by_request_and_status", ["roommateRequestId", "status"])
+      .index("by_requester_and_status", ["requesterUserId", "status"]),
+
+    bookings: defineTable({
+      propertyId: v.id("properties"),
+      requesterUserId: v.id("userProfiles"),
+      ownerProfileId: v.id("ownerProfiles"),
+      status: bookingStatus,
+      startDate: v.string(),
+      endDate: v.optional(v.string()),
+      pricingPeriod: v.union(
+        v.literal("daily"),
+        v.literal("weekly"),
+        v.literal("monthly"),
+        v.literal("term"),
+        v.literal("academic_year"),
+        v.literal("yearly"),
+      ),
+      amount: v.number(),
+      currency: v.string(),
+      note: v.optional(v.string()),
+      ownerReason: v.optional(v.string()),
+      paymentStatus: paymentStatus,
+      confirmedAt: v.optional(v.number()),
+      cancelledAt: v.optional(v.number()),
+      completedAt: v.optional(v.number()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_requester_and_status", ["requesterUserId", "status"])
+      .index("by_requester_and_property_and_status", ["requesterUserId", "propertyId", "status"])
+      .index("by_owner_and_status", ["ownerProfileId", "status"])
+      .index("by_property_and_status", ["propertyId", "status"])
+      .index("by_status_and_created", ["status", "createdAt"]),
+
+    payments: defineTable({
+      userId: v.id("userProfiles"),
+      entityType: paymentEntityType,
+      propertyId: v.optional(v.id("properties")),
+      roommateRequestId: v.optional(v.id("roommateRequests")),
+      bookingId: v.optional(v.id("bookings")),
+      provider: v.string(),
+      providerReference: v.optional(v.string()),
+      idempotencyKey: v.string(),
+      amount: v.number(),
+      currency: v.string(),
+      status: paymentStatus,
+      verifiedAt: v.optional(v.number()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_idempotency_key", ["idempotencyKey"])
+      .index("by_provider_reference", ["provider", "providerReference"])
+      .index("by_property_and_status", ["propertyId", "status"])
+      .index("by_roommate_request_and_status", ["roommateRequestId", "status"])
+      .index("by_booking_and_status", ["bookingId", "status"])
+      .index("by_user_and_status", ["userId", "status"]),
 
     negotiationSignals: defineTable({
       userId: v.id("userProfiles"),
@@ -723,10 +927,18 @@ export default defineSchema(
 
     auditEvents: defineTable({
       actorUserId: v.optional(v.id("userProfiles")),
+      adminId: v.optional(v.id("userProfiles")),
       actorType,
       action: v.string(),
+      entity: v.optional(v.string()),
       targetTable: v.optional(v.string()),
       targetId: v.optional(v.string()),
+      entityType: v.optional(v.string()),
+      entityId: v.optional(v.string()),
+      timestamp: v.optional(v.number()),
+      reason: v.optional(v.string()),
+      previousValue: v.optional(v.any()),
+      newValue: v.optional(v.any()),
       metadata: v.optional(v.any()),
       ipHash: v.optional(v.string()),
       userAgentHash: v.optional(v.string()),
@@ -735,7 +947,15 @@ export default defineSchema(
       .index("by_actor_created", ["actorUserId", "createdAt"])
       .index("by_action_created", ["action", "createdAt"])
       .index("by_target", ["targetTable", "targetId"])
+      .index("by_entity", ["entityType", "entityId"])
       .index("by_created", ["createdAt"]),
+
+    bootstrapRuns: defineTable({
+      key: v.string(),
+      completedByUserId: v.id("userProfiles"),
+      completedAt: v.number(),
+      metadata: v.optional(v.any()),
+    }).index("by_key", ["key"]),
 
     featureFlagOverrides: defineTable({
       scope: featureFlagScope,

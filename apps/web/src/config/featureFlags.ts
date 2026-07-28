@@ -1,27 +1,23 @@
 export type FeatureFlagKey =
+  | "auth.identityFoundation.enabled"
   | "auth.convexAuth.enabled"
   | "auth.google.enabled"
   | "auth.emailOtp.enabled"
   | "auth.phoneOtp.enabled"
   | "auth.apple.enabled"
   | "data.convex.enabled"
-  | "data.localStorageExport.enabled"
-  | "data.dualRead.enabled"
-  | "data.dualWrite.enabled"
   | "maps.universityDirections.enabled";
 
 export type FeatureFlagMap = Readonly<Record<FeatureFlagKey, boolean>>;
 
 export const defaultFeatureFlags: FeatureFlagMap = {
+  "auth.identityFoundation.enabled": true,
   "auth.convexAuth.enabled": false,
   "auth.google.enabled": false,
   "auth.emailOtp.enabled": false,
   "auth.phoneOtp.enabled": false,
   "auth.apple.enabled": false,
-  "data.convex.enabled": false,
-  "data.localStorageExport.enabled": true,
-  "data.dualRead.enabled": false,
-  "data.dualWrite.enabled": false,
+  "data.convex.enabled": true,
   "maps.universityDirections.enabled": true,
 };
 
@@ -34,6 +30,9 @@ function envFlag(name: string): boolean | undefined {
 export function getFeatureFlags(): FeatureFlagMap {
   return {
     ...defaultFeatureFlags,
+    "auth.identityFoundation.enabled":
+      envFlag("VITE_FEATURE_AUTH_IDENTITY_FOUNDATION_ENABLED") ??
+      defaultFeatureFlags["auth.identityFoundation.enabled"],
     "auth.convexAuth.enabled":
       envFlag("VITE_FEATURE_AUTH_CONVEX_AUTH_ENABLED") ??
       defaultFeatureFlags["auth.convexAuth.enabled"],
@@ -48,12 +47,6 @@ export function getFeatureFlags(): FeatureFlagMap {
     "auth.apple.enabled": false,
     "data.convex.enabled":
       envFlag("VITE_FEATURE_DATA_CONVEX_ENABLED") ?? defaultFeatureFlags["data.convex.enabled"],
-    "data.dualRead.enabled":
-      envFlag("VITE_FEATURE_DATA_DUAL_READ_ENABLED") ??
-      defaultFeatureFlags["data.dualRead.enabled"],
-    "data.dualWrite.enabled":
-      envFlag("VITE_FEATURE_DATA_DUAL_WRITE_ENABLED") ??
-      defaultFeatureFlags["data.dualWrite.enabled"],
     "maps.universityDirections.enabled":
       envFlag("VITE_FEATURE_MAPS_UNIVERSITY_DIRECTIONS_ENABLED") ??
       defaultFeatureFlags["maps.universityDirections.enabled"],

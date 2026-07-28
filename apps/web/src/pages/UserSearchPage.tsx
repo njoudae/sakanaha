@@ -1,8 +1,8 @@
 import { ArrowRight, Filter, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import MockMap from "../components/MockMap";
+import PropertyOverviewMap from "../components/PropertyOverviewMap";
 import PropertyCard from "../components/PropertyCard";
-import { getOwnerSubmittedPublishedProperties } from "../services/propertyService";
+import { useBusinessData } from "../data/BusinessDataContext";
 import type { UniversityLocation, User } from "@saknaha/shared-types";
 
 const markerColors = ["#7f3b75", "#25856f", "#4f8aa8", "#b86b5a", "#6b5b95"];
@@ -22,13 +22,15 @@ export default function UserSearchPage({
   onHome,
   onProperty,
 }: UserSearchPageProps) {
+  const business = useBusinessData();
   const [query, setQuery] = useState("");
   const [maxPrice, setMaxPrice] = useState(String(user?.monthlyBudget || 2500));
+  const userCity = user?.city;
 
   const properties = useMemo(() => {
     const normalized = query.trim();
-    return getOwnerSubmittedPublishedProperties().filter((property) => {
-      const byCity = !user?.city || property.city === user.city;
+    return business.properties.filter((property) => {
+      const byCity = !userCity || property.city === userCity;
       const byPrice = property.price <= (Number(maxPrice) || Number.MAX_SAFE_INTEGER);
       const byText =
         !normalized ||
@@ -37,7 +39,7 @@ export default function UserSearchPage({
         property.universityNearby.includes(normalized);
       return byCity && byPrice && byText;
     });
-  }, [maxPrice, query, user?.city]);
+  }, [business.properties, maxPrice, query, userCity]);
 
   return (
     <main className="page-shell">
@@ -58,7 +60,7 @@ export default function UserSearchPage({
       </header>
       <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-4">
-          <MockMap properties={properties} selectedUniversity={selectedUniversity} />
+          <PropertyOverviewMap properties={properties} selectedUniversity={selectedUniversity} />
           <div className="panel">
             <div className="mb-4 flex items-center gap-2">
               <Filter size={20} className="text-berry" aria-hidden="true" />

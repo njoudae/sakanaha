@@ -11,14 +11,8 @@ import {
   UserRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
-import {
-  addRoommateJoinRequest,
-  getPropertyById,
-  getRoommateRequestById,
-  hasRoommateJoinRequest,
-  recordRoommateRequestView,
-} from "../services/propertyService";
+import { useState } from "react";
+import { useBusinessData } from "../data/BusinessDataContext";
 import type { RoommateLifestylePreferences, User } from "@saknaha/shared-types";
 import { getRoommatePricePerPerson } from "../services/listingPresentation";
 
@@ -68,18 +62,15 @@ export default function RoommateDetailsPage({
   onBack,
   onLogin,
 }: RoommateDetailsPageProps) {
-  const request = getRoommateRequestById(requestId);
-  const property = request ? getPropertyById(request.propertyId) : null;
+  const business = useBusinessData();
+  const request = business.roommateRequests.find((item) => item.id === requestId);
+  const property = request?.linkedPropertyId
+    ? (business.properties.find((item) => item.id === request.linkedPropertyId) ?? null)
+    : null;
   const [sending, setSending] = useState(false);
-  const [confirmed, setConfirmed] = useState(
-    Boolean(user && hasRoommateJoinRequest(requestId, user.id)),
-  );
+  const [confirmed, setConfirmed] = useState(false);
 
-  useEffect(() => {
-    recordRoommateRequestView(requestId, user?.id ?? "guest-user");
-  }, [requestId, user?.id]);
-
-  if (!request || !property) {
+  if (!request) {
     return (
       <main className="mx-auto w-full max-w-4xl px-4 py-10 md:px-8">
         <button className="secondary-button mb-5" onClick={onBack} type="button">
@@ -96,20 +87,21 @@ export default function RoommateDetailsPage({
     );
   }
 
-  const linkedToSaknaha = request.source === "saknaha_property";
+  const linkedToSaknaha = request.source === "saknaha_property" && property !== null;
   const pricePerPerson = getRoommatePricePerPerson(request, property);
+  const city = property?.city ?? request.externalHousing?.city ?? request.city ?? "";
+  const district =
+    property?.neighborhood ?? request.externalHousing?.district ?? request.district ?? "";
 
   async function registerInterest() {
     if (!user || !request || request.userId === user.id || sending || confirmed) return;
     setSending(true);
-    await new Promise((resolve) => window.setTimeout(resolve, 700));
-    const saved = addRoommateJoinRequest({
-      requestId: request.id,
-      requesterUserId: user.id,
-      requesterName: user.name,
-    });
-    setSending(false);
-    if (saved) setConfirmed(true);
+    try {
+      await business.registerRoommateInterest(request.id);
+      setConfirmed(true);
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -126,7 +118,7 @@ export default function RoommateDetailsPage({
         </h1>
         <p className="mt-2 flex items-center gap-1.5 text-sm font-bold text-stone-500">
           <MapPin size={15} aria-hidden="true" />
-          {property.city}، حي {property.neighborhood}
+          {city}، حي {district}
         </p>
       </header>
 
@@ -144,8 +136,8 @@ export default function RoommateDetailsPage({
               label="الجامعة أو جهة العمل"
               value={request.organization || "غير محدد"}
             />
-            <Info icon={MapPin} label="المدينة" value={property.city} />
-            <Info icon={MapPin} label="الحي" value={property.neighborhood} />
+            <Info icon={MapPin} label="المدينة" value={city} />
+            <Info icon={MapPin} label="الحي" value={district} />
             <Info
               icon={DoorOpen}
               label="الغرف المتبقية"
@@ -185,7 +177,7 @@ export default function RoommateDetailsPage({
         </div>
       </section>
 
-      {linkedToSaknaha ? (
+      {linkedToSaknaha && property ? (
         <section className="panel mt-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

@@ -2,8 +2,8 @@ import type { Property, RoommateRequest } from "@saknaha/shared-types";
 import entranceImage from "../assets/property-media/rond-abha-entrance.png";
 import livingRoomImage from "../assets/property-media/rond-abha-living-room.png";
 
-const now = "2026-07-26T12:00:00.000Z";
-const previewPreferences: NonNullable<RoommateRequest["preferences"]> = {
+const createdAt = "2026-07-26T12:00:00.000Z";
+const sharedPreferences: NonNullable<RoommateRequest["preferences"]> = {
   smoking: "no",
   guests: "occasionally",
   sleep: "early",
@@ -14,14 +14,14 @@ const previewPreferences: NonNullable<RoommateRequest["preferences"]> = {
   noise: "quiet",
 };
 
-function makeProperty(id: string, overrides: Partial<Property>): Property {
+function property(id: string, overrides: Partial<Property>): Property {
   return {
     id,
-    ownerId: "preview-owner",
+    ownerId: "local-example-owner",
     ownerName: "فريق سكنها",
-    ownerPhone: "966500000000",
+    ownerPhone: "",
     title: "سكن نسائي مفروش ومتكامل",
-    propertyLicenseNumber: "واجهة تجريبية",
+    propertyLicenseNumber: "عرض محلي",
     region: "منطقة عسير",
     city: "أبها",
     neighborhood: "القريقر",
@@ -57,7 +57,7 @@ function makeProperty(id: string, overrides: Partial<Property>): Property {
     paymentType: "شهري",
     rentalPrices: { weekly: 650, monthly: 1850, yearly: 18500 },
     negotiable: false,
-    allowWhatsappContact: true,
+    allowWhatsappContact: false,
     services: [
       {
         id: `${id}-service`,
@@ -74,14 +74,14 @@ function makeProperty(id: string, overrides: Partial<Property>): Property {
     paymentCompleted: true,
     distanceText: "٦ دقائق",
     timeText: "٦ دقائق بالسيارة",
-    createdAt: now,
+    createdAt,
     ...overrides,
   };
 }
 
-export const previewProperties: Property[] = [
-  makeProperty("preview-rond-abha", {}),
-  makeProperty("preview-almalqa-riyadh", {
+export const localDevelopmentProperties: Property[] = [
+  property("local-example-rond-abha", {}),
+  property("local-example-almalqa-riyadh", {
     title: "شقق فندقية نسائية في حي الملقا",
     region: "منطقة الرياض",
     city: "الرياض",
@@ -101,7 +101,7 @@ export const previewProperties: Property[] = [
     rentalPrices: { monthly: 2400, yearly: 25000 },
     images: [entranceImage, livingRoomImage],
   }),
-  makeProperty("preview-alfaisaliyah-jeddah", {
+  property("local-example-alfaisaliyah-jeddah", {
     title: "فندق مخصص لإقامة السيدات",
     region: "منطقة مكة المكرمة",
     city: "جدة",
@@ -118,10 +118,9 @@ export const previewProperties: Property[] = [
     maxRooms: 1,
     bathrooms: 1,
     price: 220,
-    paymentType: "شهري",
     rentalPrices: { daily: 220, weekly: 1150, monthly: 3900 },
   }),
-  makeProperty("preview-alrawdah-dammam", {
+  property("local-example-alrawdah-dammam", {
     title: "دور نسائي هادئ قريب من الخدمات",
     region: "المنطقة الشرقية",
     city: "الدمام",
@@ -142,11 +141,12 @@ export const previewProperties: Property[] = [
   }),
 ];
 
-export const previewRoommateRequests: RoommateRequest[] = [
+export const localDevelopmentRoommateRequests: RoommateRequest[] = [
   {
-    id: "preview-roommate-noura",
-    propertyId: "preview-rond-abha",
-    userId: "preview-user-noura",
+    id: "local-example-roommate-noura",
+    propertyId: "local-example-rond-abha",
+    linkedPropertyId: "local-example-rond-abha",
+    userId: "local-example-user-noura",
     requesterName: "نورة",
     userType: "student",
     age: 22,
@@ -156,17 +156,18 @@ export const previewRoommateRequests: RoommateRequest[] = [
     availableRooms: 2,
     source: "saknaha_property",
     pricePerPerson: 1250,
-    preferences: previewPreferences,
+    preferences: sharedPreferences,
     city: "أبها",
     district: "القريقر",
     landmark: "جامعة الملك خالد",
     publicationStatus: "approved",
-    createdAt: now,
+    createdAt,
   },
   {
-    id: "preview-roommate-reem",
-    propertyId: "preview-almalqa-riyadh",
-    userId: "preview-user-reem",
+    id: "local-example-roommate-reem",
+    propertyId: "local-example-almalqa-riyadh",
+    linkedPropertyId: "local-example-almalqa-riyadh",
+    userId: "local-example-user-reem",
     requesterName: "ريم",
     userType: "employee",
     age: 27,
@@ -176,17 +177,17 @@ export const previewRoommateRequests: RoommateRequest[] = [
     availableRooms: 1,
     source: "saknaha_property",
     pricePerPerson: 1700,
-    preferences: { ...previewPreferences, occupation: "employee", sleep: "flexible" },
+    preferences: { ...sharedPreferences, occupation: "employee", sleep: "flexible" },
     city: "الرياض",
     district: "الملقا",
     landmark: "بوليفارد رياض سيتي",
     publicationStatus: "approved",
-    createdAt: now,
+    createdAt,
   },
   {
-    id: "preview-roommate-layan",
-    propertyId: "preview-alfaisaliyah-jeddah",
-    userId: "preview-user-layan",
+    id: "local-example-roommate-layan",
+    propertyId: "",
+    userId: "local-example-user-layan",
     requesterName: "ليان",
     userType: "student",
     age: 24,
@@ -195,12 +196,18 @@ export const previewRoommateRequests: RoommateRequest[] = [
     bio: "نبحث عن شريكة اجتماعية ومرتبة. السكن قريب من الجامعة والخدمات الأساسية.",
     availableRooms: 2,
     source: "external_property",
+    externalHousing: {
+      city: "جدة",
+      district: "الفيصلية",
+      approximateLocation: "قريب من جامعة جدة وعزيز مول",
+      nearbyLandmarks: ["جامعة جدة", "عزيز مول"],
+    },
     pricePerPerson: 1450,
-    preferences: { ...previewPreferences, sleep: "late", cleanliness: "average" },
+    preferences: { ...sharedPreferences, sleep: "late", cleanliness: "average" },
     city: "جدة",
     district: "الفيصلية",
     landmark: "عزيز مول",
     publicationStatus: "approved",
-    createdAt: now,
+    createdAt,
   },
 ];

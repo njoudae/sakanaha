@@ -1,31 +1,20 @@
 import { ConvexAuthProvider, useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
 import type { TokenStorage } from "@convex-dev/auth/react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { ConvexProvider, useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { AuthService } from "./AuthService";
 import { AuthServiceContext } from "./AuthServiceContext";
-import { localStorageAuthService } from "./localStorageAuthService";
 import { getFeatureFlags, type FeatureFlagMap } from "../config/featureFlags";
-import { createConvexAuthClient } from "../data/convexClient";
-import { mockUniversities } from "@saknaha/constants/mockUniversities";
+import { createConvexAuthClient, createConvexClient } from "../data/convexClient";
 import type { UniversityLocation } from "@saknaha/shared-types";
-import {
-  getCurrentOwner,
-  getCurrentUser,
-  loginOwner,
-  loginUser,
-  logoutOwner,
-  logoutUser,
-  registerOwner,
-  registerUser,
-} from "../services/userService";
+import type { Owner, User } from "@saknaha/shared-types";
 import { MediaServiceContext, browserMediaService } from "../media/MediaServiceContext";
 import { createConvexMediaService } from "../media/convexMediaService";
 import {
   AdminDataContext,
-  LocalAdminDataProvider,
+  emptyAdminData,
   type AdminDataValue,
   type ModerationStatus,
   type PlatformRole,
@@ -37,6 +26,45 @@ import {
   type NotificationDataValue,
 } from "../data/NotificationDataContext";
 import { browserMapsData, MapsDataContext, type MapsDataValue } from "../data/MapsDataContext";
+import { ConvexBusinessProvider } from "../data/ConvexBusinessProvider";
+import { DevelopmentBusinessProvider } from "../data/DevelopmentBusinessProvider";
+
+const unavailableAuthService: AuthService = {
+  kind: "convex",
+  capabilities: {
+    google: false,
+    emailOtp: false,
+    phoneOtp: false,
+    apple: false,
+    sessionRefresh: false,
+  },
+  universityBranches: [],
+  selectedUniversityBranch: null,
+  getCurrentOwner: () => null,
+  getCurrentUser: () => null,
+  loginOwnerWithPhone: async () => null,
+  loginUserWithPhone: async () => null,
+  registerOwner: async () => {
+    throw new Error("Authentication is not configured.");
+  },
+  registerUser: async () => {
+    throw new Error("Authentication is not configured.");
+  },
+  logout: async () => undefined,
+  signInWithGoogle: async () => {
+    throw new Error("Authentication is not configured.");
+  },
+  requestEmailOtp: async () => {
+    throw new Error("Authentication is not configured.");
+  },
+  verifyEmailOtp: async () => false,
+  requestPhoneOtp: async () => {
+    throw new Error("Authentication is not configured.");
+  },
+  verifyPhoneOtp: async () => false,
+  refreshSession: async () => false,
+  saveSelectedUniversityBranch: async () => undefined,
+};
 
 function browserSessionStorage(): TokenStorage | undefined {
   return typeof window === "undefined" ? undefined : window.sessionStorage;
@@ -81,6 +109,9 @@ function ConvexAuthServiceBridge({
     api.userProfiles.current,
     authState.isAuthenticated ? {} : "skip",
   );
+  const currentOwner = useQuery(api.agents.current, authState.isAuthenticated ? {} : "skip");
+  const saveOwner = useMutation(api.agents.saveMine);
+  const updateCurrentUser = useMutation(api.users.updateMine);
   const createMediaUpload = useMutation(api.media.createUpload);
   const createVideoUpload = useMutation(api.media.createVideoUpload);
   const retryMediaUpload = useMutation(api.media.retryUpload);
@@ -124,11 +155,26 @@ function ConvexAuthServiceBridge({
         }
       : "skip",
   );
+  const adminAgents = useQuery(
+    api.agents.listForAdmin,
+    isAdmin
+      ? {
+          paginationOpts: { numItems: 100, cursor: null },
+        }
+      : "skip",
+  );
+  const adminBookings = useQuery(api.admin.listBookings, isAdmin ? {} : "skip");
+  const adminPayments = useQuery(api.admin.listPayments, isAdmin ? {} : "skip");
+  const adminAuditEvents = useQuery(api.admin.listAuditEvents, isAdmin ? {} : "skip");
   const updateAdminUserStatus = useMutation(api.admin.updateUserStatus);
+  const updateAdminUserRole = useMutation(api.admin.updateUserRole);
+  const moderateAdminAgent = useMutation(api.agents.moderate);
   const moderateAdminProperty = useMutation(api.admin.moderateProperty);
   const deleteAdminProperty = useMutation(api.admin.deleteProperty);
+  const setAdminPropertyOperationalStatus = useMutation(api.admin.setPropertyOperationalStatus);
   const moderateAdminRoommate = useMutation(api.admin.moderateRoommateRequest);
   const deleteAdminRoommate = useMutation(api.admin.deleteRoommateRequest);
+  const setAdminRoommateOperationalStatus = useMutation(api.admin.setRoommateCardOperationalStatus);
   const notificationList = useQuery(
     api.notifications.list,
     currentProfile ? { paginationOpts: { numItems: 30, cursor: null } } : "skip",
@@ -176,11 +222,19 @@ function ConvexAuthServiceBridge({
         (adminOverview === undefined ||
           adminUsers === undefined ||
           adminProperties === undefined ||
-          adminRoommates === undefined),
+          adminRoommates === undefined ||
+          adminAgents === undefined ||
+          adminBookings === undefined ||
+          adminPayments === undefined ||
+          adminAuditEvents === undefined),
       overview: adminOverview ?? null,
       users: adminUsers ?? [],
       properties: adminProperties ?? [],
       roommates: adminRoommates ?? [],
+      agents: adminAgents?.page ?? [],
+      bookings: adminBookings ?? [],
+      payments: adminPayments ?? [],
+      auditEvents: adminAuditEvents ?? [],
       userSearch,
       userRole,
       userStatus,
@@ -197,6 +251,21 @@ function ConvexAuthServiceBridge({
           status,
         });
       },
+      updateUserRole: async (userId, role, reason) => {
+        await updateAdminUserRole({
+          userId: userId as Id<"userProfiles">,
+          role,
+          reason,
+        });
+      },
+      moderateAgent: async (ownerProfileId, verification, status, reason) => {
+        await moderateAdminAgent({
+          ownerProfileId: ownerProfileId as Id<"ownerProfiles">,
+          verification,
+          status,
+          reason,
+        });
+      },
       moderateProperty: async (propertyId, moderation, reason) => {
         await moderateAdminProperty({
           propertyId: propertyId as Id<"properties">,
@@ -206,6 +275,13 @@ function ConvexAuthServiceBridge({
       },
       deleteProperty: async (propertyId) => {
         await deleteAdminProperty({ propertyId: propertyId as Id<"properties"> });
+      },
+      setPropertyOperationalStatus: async (propertyId, status, reason) => {
+        await setAdminPropertyOperationalStatus({
+          propertyId: propertyId as Id<"properties">,
+          status,
+          reason,
+        });
       },
       moderateRoommate: async (roommateId, moderation, reason) => {
         await moderateAdminRoommate({
@@ -217,9 +293,20 @@ function ConvexAuthServiceBridge({
       deleteRoommate: async (roommateId) => {
         await deleteAdminRoommate({ requestId: roommateId as Id<"roommateRequests"> });
       },
+      setRoommateOperationalStatus: async (roommateId, status, reason) => {
+        await setAdminRoommateOperationalStatus({
+          requestId: roommateId as Id<"roommateRequests">,
+          status,
+          reason,
+        });
+      },
     }),
     [
       adminOverview,
+      adminAgents,
+      adminAuditEvents,
+      adminBookings,
+      adminPayments,
       adminProperties,
       adminRoommates,
       adminUsers,
@@ -227,12 +314,16 @@ function ConvexAuthServiceBridge({
       currentProfile,
       isAdmin,
       moderateAdminProperty,
+      moderateAdminAgent,
       moderateAdminRoommate,
       deleteAdminProperty,
       deleteAdminRoommate,
+      setAdminPropertyOperationalStatus,
+      setAdminRoommateOperationalStatus,
       propertyModeration,
       propertySearch,
       updateAdminUserStatus,
+      updateAdminUserRole,
       userRole,
       userSearch,
       userStatus,
@@ -289,9 +380,7 @@ function ConvexAuthServiceBridge({
       kind: "convex",
       capabilities: capabilitiesFromFlags(flags),
       universityBranches: (
-        (activeUniversityBranches && activeUniversityBranches.length > 0
-          ? activeUniversityBranches
-          : mockUniversities) as readonly (ConvexUniversityBranch | UniversityLocation)[]
+        (activeUniversityBranches ?? []) as readonly (ConvexUniversityBranch | UniversityLocation)[]
       ).map((branch) =>
         "latitude" in branch
           ? {
@@ -320,17 +409,71 @@ function ConvexAuthServiceBridge({
             active: currentUniversityBranch.active,
           }
         : null,
-      getCurrentOwner,
-      getCurrentUser,
-      loginOwnerWithPhone: async (phone) => loginOwner(phone),
-      loginUserWithPhone: async (phone) => loginUser(phone),
-      registerOwner: async (input) => registerOwner(input),
-      registerUser: async (input) => registerUser(input),
+      getCurrentOwner: () =>
+        currentOwner
+          ? ({
+              id: currentOwner._id,
+              publicCode: currentProfile?.publicCode,
+              fullName: currentOwner.fullName,
+              email: currentProfile?.email,
+              phone: currentOwner.phone,
+              nationalId: currentOwner.ministryPropertyNumber,
+              region: currentProfile?.city,
+              ministryPropertyNumber: currentOwner.ministryPropertyNumber ?? "",
+              createdAt: new Date(currentOwner.createdAt).toISOString(),
+            } satisfies Owner)
+          : null,
+      getCurrentUser: () =>
+        currentProfile
+          ? ({
+              id: currentProfile._id,
+              publicCode: currentProfile.publicCode,
+              name: currentProfile.name,
+              email: currentProfile.email,
+              phone: currentProfile.phone ?? "",
+              role: currentProfile.userType ?? "employee",
+              platformRole: currentProfile.primaryRole,
+              city: currentProfile.city ?? "",
+              monthlyBudget: currentProfile.monthlyBudget ?? 0,
+              acceptsRoommate: currentProfile.acceptsRoommate ?? false,
+              roommatePreferences: currentProfile.roommatePreferences,
+              selectedUniversityBranchId: currentProfile.selectedUniversityBranchId,
+              createdAt: new Date(currentProfile.createdAt).toISOString(),
+            } satisfies User)
+          : null,
+      loginOwnerWithPhone: async () => null,
+      loginUserWithPhone: async () => null,
+      registerOwner: async (input) => {
+        const ownerId = await saveOwner({
+          fullName: input.fullName,
+          phone: input.phone,
+          ministryPropertyNumber: input.ministryPropertyNumber,
+        });
+        return {
+          ...input,
+          id: ownerId,
+          createdAt: new Date().toISOString(),
+        };
+      },
+      registerUser: async (input) => {
+        await updateCurrentUser({
+          name: input.name,
+          city: input.city,
+          phone: input.phone,
+          email: input.email,
+          roommatePreferences: input.roommatePreferences,
+        });
+        return {
+          ...input,
+          id: currentProfile?._id ?? "",
+          createdAt: currentProfile
+            ? new Date(currentProfile.createdAt).toISOString()
+            : new Date().toISOString(),
+        };
+      },
       logout: async () => {
         await recordAuthEvent({ event: "logout" }).catch(() => undefined);
         await signOut();
-        logoutOwner();
-        logoutUser();
       },
       signInWithGoogle: async () => {
         if (!flags["auth.google.enabled"]) {
@@ -435,11 +578,15 @@ function ConvexAuthServiceBridge({
       authState,
       activeUniversityBranches,
       currentUniversityBranch,
+      currentOwner,
+      currentProfile,
       flags,
       recordAuthEvent,
       saveSelectedUniversityBranch,
+      saveOwner,
       signIn,
       signOut,
+      updateCurrentUser,
     ],
   );
 
@@ -449,7 +596,9 @@ function ConvexAuthServiceBridge({
         <NotificationDataContext.Provider value={notificationData}>
           <MapsDataContext.Provider value={mapsData}>
             <MediaServiceContext.Provider value={mediaService}>
-              {children}
+              <ConvexBusinessProvider authenticated={authState.isAuthenticated}>
+                {children}
+              </ConvexBusinessProvider>
             </MediaServiceContext.Provider>
           </MapsDataContext.Provider>
         </NotificationDataContext.Provider>
@@ -461,20 +610,38 @@ function ConvexAuthServiceBridge({
 export function AuthServiceProvider({ children }: { children: ReactNode }) {
   const flags = useMemo(() => getFeatureFlags(), []);
   const convexClient = useMemo(() => createConvexAuthClient(flags), [flags]);
+  const dataClient = useMemo(() => createConvexClient(flags), [flags]);
 
   if (convexClient === null) {
+    if (dataClient === null) {
+      return (
+        <AuthServiceContext.Provider value={unavailableAuthService}>
+          <AdminDataContext.Provider value={emptyAdminData}>
+            <NotificationDataContext.Provider value={emptyNotificationData}>
+              <MapsDataContext.Provider value={browserMapsData}>
+                <MediaServiceContext.Provider value={browserMediaService}>
+                  <DevelopmentBusinessProvider>{children}</DevelopmentBusinessProvider>
+                </MediaServiceContext.Provider>
+              </MapsDataContext.Provider>
+            </NotificationDataContext.Provider>
+          </AdminDataContext.Provider>
+        </AuthServiceContext.Provider>
+      );
+    }
     return (
-      <AuthServiceContext.Provider value={localStorageAuthService}>
-        <LocalAdminDataProvider>
-          <NotificationDataContext.Provider value={emptyNotificationData}>
-            <MapsDataContext.Provider value={browserMapsData}>
-              <MediaServiceContext.Provider value={browserMediaService}>
-                {children}
-              </MediaServiceContext.Provider>
-            </MapsDataContext.Provider>
-          </NotificationDataContext.Provider>
-        </LocalAdminDataProvider>
-      </AuthServiceContext.Provider>
+      <ConvexProvider client={dataClient}>
+        <AuthServiceContext.Provider value={unavailableAuthService}>
+          <AdminDataContext.Provider value={emptyAdminData}>
+            <NotificationDataContext.Provider value={emptyNotificationData}>
+              <MapsDataContext.Provider value={browserMapsData}>
+                <MediaServiceContext.Provider value={browserMediaService}>
+                  <ConvexBusinessProvider authenticated={false}>{children}</ConvexBusinessProvider>
+                </MediaServiceContext.Provider>
+              </MapsDataContext.Provider>
+            </NotificationDataContext.Provider>
+          </AdminDataContext.Provider>
+        </AuthServiceContext.Provider>
+      </ConvexProvider>
     );
   }
 

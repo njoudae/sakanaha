@@ -4,10 +4,6 @@ import AppBar from "./components/AppBar";
 import DashboardShell from "./components/DashboardShell";
 import Footer from "./components/Footer";
 import { useAuthService } from "./auth";
-import {
-  getSelectedUniversityBranch,
-  saveLocalUniversityPreference,
-} from "./services/universityPreferenceService";
 import type { Owner, Property, UniversityLocation, User } from "@saknaha/shared-types";
 import { useAdminData } from "./data/AdminDataContext";
 
@@ -21,8 +17,6 @@ const FaqPage = lazy(() => import("./pages/FaqPage"));
 const HousingPage = lazy(() => import("./pages/HousingPage"));
 const ManagePropertyPage = lazy(() => import("./pages/ManagePropertyPage"));
 const OwnerDashboardPage = lazy(() => import("./pages/OwnerDashboardPage"));
-const OwnerLoginPage = lazy(() => import("./pages/OwnerLoginPage"));
-const OwnerRegisterPage = lazy(() => import("./pages/OwnerRegisterPage"));
 const PropertyDetailsPage = lazy(() => import("./pages/PropertyDetailsPage"));
 const RoommateDetailsPage = lazy(() => import("./pages/RoommateDetailsPage"));
 const RoommatesPage = lazy(() => import("./pages/RoommatesPage"));
@@ -30,20 +24,14 @@ const RoommateCreatePage = lazy(() => import("./pages/RoommateCreatePage"));
 const SupportPage = lazy(() => import("./pages/SupportPage"));
 const UserDashboardPage = lazy(() => import("./pages/UserDashboardPage"));
 const UserLocationPage = lazy(() => import("./pages/UserLocationPage"));
-const UserLoginPage = lazy(() => import("./pages/UserLoginPage"));
-const UserRegisterPage = lazy(() => import("./pages/UserRegisterPage"));
 const UserSearchPage = lazy(() => import("./pages/UserSearchPage"));
 
 type Route =
   | "landing"
-  | "owner-login"
-  | "owner-register"
   | "owner-dashboard"
   | "add-property"
   | "manage-property"
   | "owner-property-preview"
-  | "user-login"
-  | "user-register"
   | "user-dashboard"
   | "user-location"
   | "user-search"
@@ -117,8 +105,8 @@ export default function App() {
   const [owner, setOwner] = useState<Owner | null>(() => authService.getCurrentOwner());
   const [user, setUser] = useState<User | null>(() => authService.getCurrentUser());
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
-  const [selectedUniversity, setSelectedUniversity] = useState<UniversityLocation | null>(() =>
-    getSelectedUniversityBranch(authService.getCurrentUser()),
+  const [selectedUniversity, setSelectedUniversity] = useState<UniversityLocation | null>(
+    authService.selectedUniversityBranch,
   );
   const [pendingUserRoute, setPendingUserRoute] = useState<RouteState | null>(null);
   const [returnToUserDashboard, setReturnToUserDashboard] = useState(false);
@@ -145,6 +133,14 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setOwner(authService.getCurrentOwner());
+      setUser(authService.getCurrentUser());
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [authService]);
+
   const effectiveSelectedUniversity = selectedUniversity ?? authService.selectedUniversityBranch;
 
   function refresh() {
@@ -153,8 +149,6 @@ export default function App() {
 
   function handleUniversityChange(university: UniversityLocation | null) {
     setSelectedUniversity(university);
-    const updatedUser = saveLocalUniversityPreference(user, university?.id ?? null);
-    if (updatedUser) setUser(updatedUser);
     void authService.saveSelectedUniversityBranch(university?.id ?? null).catch(() => undefined);
   }
 
@@ -337,8 +331,6 @@ export default function App() {
     setUser(nextUser);
     setOwner(null);
     if (effectiveSelectedUniversity) {
-      const updatedUser = saveLocalUniversityPreference(nextUser, effectiveSelectedUniversity.id);
-      if (updatedUser) setUser(updatedUser);
       void authService
         .saveSelectedUniversityBranch(effectiveSelectedUniversity.id)
         .catch(() => undefined);
@@ -440,22 +432,6 @@ export default function App() {
     );
   }
 
-  if (route === "owner-login") {
-    return frame(
-      <OwnerLoginPage
-        onHome={() => navigatePublic({ route: "landing" })}
-        onLogin={completeOwnerAuth}
-        onCreateAccount={() => setRoute("owner-register")}
-      />,
-    );
-  }
-
-  if (route === "owner-register") {
-    return frame(
-      <OwnerRegisterPage onBack={() => setRoute("owner-login")} onDone={completeOwnerAuth} />,
-    );
-  }
-
   if (route === "owner-dashboard" && owner) {
     return frame(
       <DashboardShell
@@ -531,28 +507,6 @@ export default function App() {
         onOwnerProperties={() => setRoute("owner-dashboard")}
         selectedUniversity={effectiveSelectedUniversity}
         onUniversityChange={handleUniversityChange}
-      />,
-    );
-  }
-
-  if (route === "user-login") {
-    return frame(
-      <UserLoginPage
-        onHome={() => {
-          setPendingUserRoute(null);
-          navigatePublic({ route: "landing" });
-        }}
-        onLogin={completeUserAuth}
-        onCreateAccount={() => setRoute("user-register")}
-      />,
-    );
-  }
-
-  if (route === "user-register") {
-    return frame(
-      <UserRegisterPage
-        onBack={() => setRoute("user-login")}
-        onDone={(nextUser) => completeUserAuth(nextUser, { isNewAccount: true })}
       />,
     );
   }

@@ -1,20 +1,6 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import type { MutationCtx } from "./_generated/server";
 import { mutation } from "./_generated/server";
-
-async function currentProfile(ctx: MutationCtx) {
-  const authUserId = await getAuthUserId(ctx);
-  if (authUserId === null) throw new Error("Authentication required.");
-  const profile = await ctx.db
-    .query("userProfiles")
-    .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
-    .unique();
-  if (profile === null || profile.status !== "active") {
-    throw new Error("An active user profile is required.");
-  }
-  return profile;
-}
+import { requireActiveProfile } from "./lib/authorization";
 
 function validCoordinates(lat: number | undefined, lng: number | undefined) {
   return (
@@ -38,7 +24,7 @@ export const submitPropertyForReview = mutation({
   args: { propertyId: v.id("properties") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const profile = await currentProfile(ctx);
+    const profile = await requireActiveProfile(ctx);
     const property = await ctx.db.get("properties", args.propertyId);
     if (property === null || property.deletedAt !== undefined) {
       throw new Error("Property not found.");
@@ -68,12 +54,13 @@ export const submitPropertyForReview = mutation({
     ) {
       throw new Error("At least one uploaded property image is required.");
     }
-    if (process.env.PUBLISHING_FEE_ENABLED === "true" && property.paymentCompleted !== true) {
+    if (property.paymentStatus !== "paid" && property.paymentCompleted !== true) {
       throw new Error("Publishing payment is required.");
     }
     const now = Date.now();
     await ctx.db.patch(property._id, {
       status: "pending_review",
+      workflowStatus: "pending_admin_review",
       publicationStatus: "pending_review",
       moderationStatus: "pending",
       rejectionReason: undefined,
@@ -89,6 +76,9 @@ export const submitPropertyForReview = mutation({
       action: "property.submitted_for_review",
       targetTable: "properties",
       targetId: property._id,
+      previousValue: { workflowStatus: property.workflowStatus ?? property.publicationStatus },
+      newValue: { workflowStatus: "pending_admin_review" },
+      timestamp: now,
       createdAt: now,
     });
     return null;
@@ -99,7 +89,7 @@ export const submitRoommateRequestForReview = mutation({
   args: { requestId: v.id("roommateRequests") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const profile = await currentProfile(ctx);
+    const profile = await requireActiveProfile(ctx);
     const request = await ctx.db.get("roommateRequests", args.requestId);
     if (request === null || request.deletedAt !== undefined) {
       throw new Error("Roommate request not found.");
@@ -107,16 +97,24 @@ export const submitRoommateRequestForReview = mutation({
     if (request.userId !== profile._id) {
       throw new Error("Only the card owner can submit it.");
     }
-    required(request.region, "Region");
-    required(request.city, "City");
-    required(request.district, "District");
+    const city = request.externalHousing?.city ?? request.city;
+    const district = request.externalHousing?.district ?? request.district;
+    required(
+      request.region ?? request.externalHousing?.approximateLocation ?? "external",
+      "Region",
+    );
+    required(city, "City");
+    required(district, "District");
     required(request.organization, "University");
-    if (!validCoordinates(request.approximateLat, request.approximateLng)) {
+    const lat = request.externalHousing?.approximateLat ?? request.approximateLat;
+    const lng = request.externalHousing?.approximateLng ?? request.approximateLng;
+    if (!validCoordinates(lat, lng)) {
       throw new Error("An approximate location is required.");
     }
     const now = Date.now();
     await ctx.db.patch(request._id, {
-      publicationStatus: "pending_review",
+      workflowStatus: request.paymentStatus === "paid" ? "pending_admin_review" : "pending_payment",
+      publicationStatus: request.paymentStatus === "paid" ? "pending_review" : "draft",
       moderationStatus: "pending",
       rejectionReason: undefined,
       submittedAt: now,
@@ -127,9 +125,18 @@ export const submitRoommateRequestForReview = mutation({
     await ctx.db.insert("auditEvents", {
       actorUserId: profile._id,
       actorType: "user",
-      action: "roommate_request.submitted_for_review",
+      action:
+        request.paymentStatus === "paid"
+          ? "roommate_request.submitted_for_review"
+          : "roommate_request.payment_requested",
       targetTable: "roommateRequests",
       targetId: request._id,
+      previousValue: { workflowStatus: request.workflowStatus ?? request.publicationStatus },
+      newValue: {
+        workflowStatus:
+          request.paymentStatus === "paid" ? "pending_admin_review" : "pending_payment",
+      },
+      timestamp: now,
       createdAt: now,
     });
     return null;

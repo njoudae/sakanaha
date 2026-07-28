@@ -1,9 +1,9 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internalMutation, mutation, query } from "./_generated/server";
+import { requireActiveProfile } from "./lib/authorization";
 import { actorType } from "./validators";
 import {
   normalizeAuditAction,
@@ -19,21 +19,10 @@ const analyticsProperties = v.record(
   v.union(v.string(), v.number(), v.boolean(), v.null()),
 );
 
-async function currentProfile(ctx: QueryCtx | MutationCtx) {
-  const authUserId = await getAuthUserId(ctx);
-  if (authUserId === null) throw new Error("Authentication required.");
-  const profile = await ctx.db
-    .query("userProfiles")
-    .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
-    .unique();
-  if (profile === null || profile.status !== "active") throw new Error("Active profile required.");
-  return profile;
-}
-
 type ObservabilityRole = "admin" | "support" | "moderator";
 
 async function requireObservabilityRole(ctx: QueryCtx, allowedRoles: readonly ObservabilityRole[]) {
-  const profile = await currentProfile(ctx);
+  const profile = await requireActiveProfile(ctx);
   if (
     (profile.primaryRole === "admin" ||
       profile.primaryRole === "support" ||
@@ -122,7 +111,7 @@ export const recordUsage = mutation({
     environment: v.string(),
   },
   handler: async (ctx, args) => {
-    const profile = await currentProfile(ctx);
+    const profile = await requireActiveProfile(ctx);
     await insertUsageEvent(ctx, { ...args, userId: profile._id });
     return null;
   },
