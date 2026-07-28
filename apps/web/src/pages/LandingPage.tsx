@@ -137,7 +137,7 @@ export default function LandingPage({
             title="جميع خيارات السكن"
             items={housing}
             onTitleClick={onHousing}
-            itemClassName="h-[468px] w-[82vw] max-w-[340px] shrink-0 snap-start sm:w-[330px]"
+            itemClassName="h-[520px] w-[88vw] max-w-[390px] shrink-0 snap-start sm:w-[360px]"
             renderItem={(property) => (
               <PropertyCard
                 property={property}

@@ -27,7 +27,6 @@ import {
 } from "../data/NotificationDataContext";
 import { browserMapsData, MapsDataContext, type MapsDataValue } from "../data/MapsDataContext";
 import { ConvexBusinessProvider } from "../data/ConvexBusinessProvider";
-import { DevelopmentBusinessProvider } from "../data/DevelopmentBusinessProvider";
 
 const unavailableAuthService: AuthService = {
   kind: "convex",
@@ -620,7 +619,7 @@ export function AuthServiceProvider({ children }: { children: ReactNode }) {
             <NotificationDataContext.Provider value={emptyNotificationData}>
               <MapsDataContext.Provider value={browserMapsData}>
                 <MediaServiceContext.Provider value={browserMediaService}>
-                  <DevelopmentBusinessProvider>{children}</DevelopmentBusinessProvider>
+                  {children}
                 </MediaServiceContext.Provider>
               </MapsDataContext.Provider>
             </NotificationDataContext.Provider>

@@ -20,7 +20,9 @@ export function createConvexClient(
   if (!shouldUseConvexData(flags)) return null;
 
   const convexUrl = getConvexUrl();
-  if (!convexUrl) return null;
+  if (!convexUrl) {
+    throw new Error("VITE_CONVEX_URL is required when data.convex.enabled is true.");
+  }
 
   return new ConvexReactClient(convexUrl);
 }
@@ -31,7 +33,9 @@ export function createConvexAuthClient(
   if (!shouldUseConvexAuth(flags)) return null;
 
   const convexUrl = getConvexUrl();
-  if (!convexUrl) return null;
+  if (!convexUrl) {
+    throw new Error("VITE_CONVEX_URL is required when auth.convexAuth.enabled is true.");
+  }
 
   return new ConvexReactClient(convexUrl);
 }

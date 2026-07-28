@@ -98,13 +98,13 @@ export default function PropertyCard({
               src={property.images[safeImageIndex]}
               alt={presentation.title}
               className={`w-full object-cover transition duration-500 group-hover:scale-[1.035] ${
-                featured ? "h-44 sm:h-48" : compact ? "h-48" : "h-60"
+                featured ? "h-48 sm:h-52" : compact ? "h-52" : "h-64"
               }`}
             />
           ) : (
             <span
               className={`flex w-full items-center justify-center bg-linen px-5 text-sm font-extrabold text-stone-500 ${
-                featured ? "h-44 sm:h-48" : compact ? "h-48" : "h-60"
+                featured ? "h-48 sm:h-52" : compact ? "h-52" : "h-64"
               }`}
             >
               لا توجد صورة متاحة
@@ -187,7 +187,7 @@ export default function PropertyCard({
       </div>
 
       <button
-        className="flex min-h-0 flex-1 flex-col px-3.5 pb-3 pt-2.5 text-right"
+        className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3 text-right"
         onClick={() => onView(property)}
         type="button"
       >
@@ -205,7 +205,7 @@ export default function PropertyCard({
           {property.city}، حي {property.neighborhood}
         </p>
 
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-y border-stone-100 py-2.5 text-xs font-bold text-stone-600">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-stone-100 py-3 text-xs font-bold text-stone-600">
           <span className="inline-flex items-center gap-1">
             <BedDouble size={15} aria-hidden="true" />
             {formatRooms(property)}
@@ -234,7 +234,7 @@ export default function PropertyCard({
           ) : null}
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-extrabold">
+        <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-extrabold">
           {property.rentIncludes?.length ? (
             <span className="inline-flex items-center gap-1 bg-emerald-50 px-2.5 py-1.5 text-emerald-700">
               <Sparkles size={13} aria-hidden="true" />
@@ -255,7 +255,7 @@ export default function PropertyCard({
           ) : null}
         </div>
 
-        <div className="mt-2 flex items-end justify-between gap-3">
+        <div className="mt-auto flex items-end justify-between gap-3 pt-4">
           <p className="text-xl font-extrabold text-ink">
             {presentation.price.toLocaleString("ar-SA")}{" "}
             <span className="text-xs font-bold text-stone-500">ر.س</span>
