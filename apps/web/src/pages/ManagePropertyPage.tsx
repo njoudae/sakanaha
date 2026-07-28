@@ -1,6 +1,6 @@
 import { ArrowRight, MapPinned, PauseCircle, Pencil, Settings } from "lucide-react";
 import Badge from "../components/Badge";
-import { getOwnerProperties, updatePropertyStatus } from "../services/propertyService";
+import { useBusinessData } from "../data/BusinessDataContext";
 import type { Owner, Property } from "@saknaha/shared-types";
 import { formatRooms, getGoogleMapsUrl } from "@saknaha/utils/propertyFormat";
 
@@ -11,18 +11,16 @@ interface ManagePropertyPageProps {
   onRefresh: () => void;
 }
 
-export default function ManagePropertyPage({
-  owner,
-  onBack,
-  onEdit,
-  onRefresh,
-}: ManagePropertyPageProps) {
-  const properties = getOwnerProperties(owner.id);
+export default function ManagePropertyPage({ onBack, onEdit, onRefresh }: ManagePropertyPageProps) {
+  const business = useBusinessData();
+  const properties = business.ownerProperties;
 
   function pause(property: Property) {
     if ((property.publicationStatus ?? "approved") !== "approved") return;
-    updatePropertyStatus(property.id, property.status === "paused" ? "published" : "paused");
-    onRefresh();
+    void business
+      .setPropertyPaused(property.id, property.status !== "paused")
+      .then(onRefresh)
+      .catch(() => undefined);
   }
 
   return (

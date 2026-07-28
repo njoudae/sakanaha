@@ -6,7 +6,8 @@ This guide prepares Saknaha for a real staging deployment without deploying auto
 
 - Frontend: Vercel, serving `apps/web`.
 - Backend: Convex Cloud, serving `convex`.
-- Local compatibility: existing localStorage flows remain available while Convex flags are disabled.
+- Business data: Convex is the only production source; disabling Convex data leaves business
+  actions unavailable and never activates browser storage or mock data.
 
 ## Required Accounts
 
@@ -220,9 +221,7 @@ Minimum staging backend/auth test:
 - `VITE_FEATURE_AUTH_GOOGLE_ENABLED=true`
 - `VITE_FEATURE_AUTH_EMAIL_OTP_ENABLED=true`
 - `VITE_FEATURE_AUTH_PHONE_OTP_ENABLED=true`, only after SMS credentials are configured
-- `VITE_FEATURE_DATA_CONVEX_ENABLED=false`, until Convex data adapters are wired into pages
-- `VITE_FEATURE_DATA_DUAL_READ_ENABLED=false`
-- `VITE_FEATURE_DATA_DUAL_WRITE_ENABLED=false`
+- `VITE_FEATURE_DATA_CONVEX_ENABLED=true`
 
 Provider flags:
 
@@ -244,9 +243,7 @@ Frontend public variables, Vercel:
 | `VITE_FEATURE_AUTH_GOOGLE_ENABLED`                | yes for Google test                 | Enables Google login UI path.                                                |
 | `VITE_FEATURE_AUTH_EMAIL_OTP_ENABLED`             | yes for Email OTP test              | Enables Email OTP UI path.                                                   |
 | `VITE_FEATURE_AUTH_PHONE_OTP_ENABLED`             | optional                            | Enables Phone OTP UI path.                                                   |
-| `VITE_FEATURE_DATA_CONVEX_ENABLED`                | optional                            | Enables Convex data client creation.                                         |
-| `VITE_FEATURE_DATA_DUAL_READ_ENABLED`             | optional                            | Future migration control.                                                    |
-| `VITE_FEATURE_DATA_DUAL_WRITE_ENABLED`            | optional                            | Future migration control.                                                    |
+| `VITE_FEATURE_DATA_CONVEX_ENABLED`                | yes                                 | Enables the sole production business-data client.                            |
 | `VITE_FEATURE_MAPS_UNIVERSITY_DIRECTIONS_ENABLED` | optional (defaults to true)         | Enables free university-to-housing directions links; no API key is required. |
 
 Convex server variables:
@@ -359,12 +356,12 @@ Staging smoke tests:
 - Phone OTP sends through Msegat when SMS is enabled.
 - Phone OTP can be stopped by `SAKNAHA_SMS_EMERGENCY_DISABLED=true`.
 - Maps geocoding/routing works with Google Maps, then falls back when provider is disabled.
-- Property creation still works through the current compatibility storage path.
+- Property creation, bookings, favorites, roommate cards, and user accounts persist in Convex.
 - Property search works.
 - Favorites work.
 - Roommate matching pages work.
 - Owner dashboard flows work.
-- Admin dashboard test is skipped until implemented.
+- Admin access and denial for ordinary users are verified.
 
 Production promotion:
 

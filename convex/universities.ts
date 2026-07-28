@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { mockUniversities, mockUniversitiesCatalog } from "@saknaha/constants/mockUniversities";
+import { universityBranches, universityCatalog } from "@saknaha/constants/universityCatalog";
 import { authenticatedIdentityKey, requireActiveProfile } from "./lib/authorization";
 
 function validLatitude(value: number) {
@@ -99,13 +99,11 @@ export const saveSelectedBranch = mutation({
       .withIndex("by_external_id", (q) => q.eq("externalId", args.branchExternalId!))
       .unique();
     if (branch === null) {
-      const catalogBranch = mockUniversities.find(
+      const catalogBranch = universityBranches.find(
         (item) => item.id === args.branchExternalId && item.active,
       );
       const catalogUniversity = catalogBranch
-        ? mockUniversitiesCatalog.find(
-            (item) => item.id === catalogBranch.universityId && item.active,
-          )
+        ? universityCatalog.find((item) => item.id === catalogBranch.universityId && item.active)
         : null;
       if (catalogBranch && catalogUniversity) {
         const now = Date.now();

@@ -2,7 +2,9 @@
 
 ## Scope
 
-M5 introduces production authentication boundaries without switching existing user journeys away from the localStorage compatibility flow. Convex Auth is the default production provider, but the UI talks only to `AuthService`.
+The application exposes a provider-agnostic authentication boundary through `AuthService`.
+Authentication providers remain disabled until the dedicated authentication phase. Public browsing
+continues safely while authenticated business actions fail closed.
 
 ## Enabled Providers
 
@@ -32,9 +34,9 @@ A future hardening option is an httpOnly secure cookie or BFF-style authenticati
 
 ## Account Linking
 
-Convex Auth links accounts by verified email or verified phone. `userProfiles.authUserId` links the platform profile to the Convex Auth user. `userProfiles.ensureCurrent` first claims an existing verified email or phone profile before creating a new profile, which avoids duplicating a person who signs in through different providers.
-
-Future providers should be added as Convex Auth providers and exposed through `AuthService`; application pages should not change.
+The platform links a profile to the stable authenticated provider identity (`identityKey`). Future
+providers must be exposed through `AuthService`; business authorization must continue to derive the
+identity server-side rather than from phone numbers or client-supplied user IDs.
 
 ## Required Server Environment
 
@@ -48,6 +50,8 @@ Future providers should be added as Convex Auth providers and exposed through `A
 - Provider credentials stay server-side; see [sms.md](./sms.md)
 - Convex Auth setup values: `SITE_URL`, `JWT_PRIVATE_KEY`, and `JWKS`
 
-## Compatibility Period
+## Disabled-provider behavior
 
-The app continues to use localStorage login/register methods through `AuthService` while `auth.convexAuth.enabled` is false. This preserves the M3 migration strategy and allows Convex Auth to be enabled independently during staged rollout.
+When no authentication provider is enabled, the application uses the unauthenticated Convex client
+for public reads. Login UI reports that authentication is unavailable, and no temporary user,
+fixed OTP, local account, or administrator path is created.

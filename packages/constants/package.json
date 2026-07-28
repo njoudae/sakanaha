@@ -16,8 +16,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./cities": "./src/cities.ts",
-    "./mockProperties": "./src/mockProperties.ts",
-    "./mockUniversities": "./src/mockUniversities.ts",
+    "./universityCatalog": "./src/universityCatalog.ts",
     "./locations": "./src/locations.ts"
   },
   "dependencies": {

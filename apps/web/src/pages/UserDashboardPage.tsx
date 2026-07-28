@@ -17,15 +17,7 @@ import { useState } from "react";
 import { cityNames } from "@saknaha/constants/cities";
 import UniversityReferenceSelector from "../components/UniversityReferenceSelector";
 import RoommatePreferencesFields from "../components/RoommatePreferencesFields";
-import {
-  getUserActivity,
-  deleteRoommateCard,
-  removeFavoriteProperty,
-  removeUserInterest,
-  updateRoommateJoinRequestStatus,
-  updateRoommateCard,
-} from "../services/propertyService";
-import { updateUserProfile, updateUserRoommatePreferences } from "../services/userService";
+import { useBusinessData } from "../data/BusinessDataContext";
 import type {
   PublicationStatus,
   RoommateLifestylePreferences,
@@ -59,7 +51,7 @@ export default function UserDashboardPage({
   selectedUniversity,
   onUniversityChange,
 }: UserDashboardPageProps) {
-  const [, setActivityVersion] = useState(0);
+  const business = useBusinessData();
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileName, setProfileName] = useState(user.name);
   const [profileCity, setProfileCity] = useState(user.city);
@@ -76,7 +68,7 @@ export default function UserDashboardPage({
   const [cardOrganization, setCardOrganization] = useState("");
   const [cardBio, setCardBio] = useState("");
   const [cardMessage, setCardMessage] = useState("");
-  const activity = getUserActivity(user.id);
+  const activity = business.activity;
   const incomingRequests = activity.roommateCards.flatMap((card) => card.incomingRequests);
   const totalCardViews = activity.roommateCards.reduce((sum, card) => sum + card.views, 0);
   const pendingIncoming = incomingRequests.filter((request) => request.status === "pending").length;
@@ -85,44 +77,49 @@ export default function UserDashboardPage({
   ).length;
 
   function updateJoinStatus(id: string, status: "accepted" | "rejected") {
-    updateRoommateJoinRequestStatus(id, user.id, status);
-    setActivityVersion((version) => version + 1);
+    void id;
+    void status;
+    setCardMessage("إدارة الطلبات الواردة ستتاح بعد ربط قناة التواصل المعتمدة.");
   }
 
-  function saveProfile() {
+  async function saveProfile() {
     const name = profileName.trim();
     if (!name) {
       setProfileMessage("اكتبي الاسم أولاً.");
       return;
     }
-    const updated = updateUserProfile(user.id, { name, city: profileCity });
-    if (!updated) {
+    try {
+      await business.updateUserProfile({ name, city: profileCity });
+    } catch {
       setProfileMessage("تعذر حفظ التعديل، حاولي مرة أخرى.");
       return;
     }
-    onUserUpdated(updated);
+    onUserUpdated({ ...user, name, city: profileCity });
     setEditingProfile(false);
     setProfileMessage("تم تحديث بياناتك.");
   }
 
   function removeInterest(propertyId: string) {
-    removeUserInterest(user.id, propertyId);
-    setActivityVersion((version) => version + 1);
+    void business.withdrawPropertyInterest(propertyId);
   }
 
-  function saveDashboardPreferences() {
-    const updated = updateUserRoommatePreferences(user.id, dashboardPreferences);
-    if (!updated) {
+  async function saveDashboardPreferences() {
+    try {
+      await business.updateUserProfile({
+        name: user.name,
+        city: user.city,
+        roommatePreferences: dashboardPreferences,
+      });
+    } catch {
       setPreferencesMessage("تعذر حفظ التفضيلات.");
       return;
     }
-    onUserUpdated(updated);
+    onUserUpdated({ ...user, roommatePreferences: dashboardPreferences });
     setPreferencesMessage("تم حفظ تفضيلات شريكة السكن.");
   }
 
   function removeFavorite(propertyId: string) {
-    removeFavoriteProperty(propertyId, user.id);
-    setActivityVersion((version) => version + 1);
+    void business.setFavorite(propertyId, false);
   }
 
   function startEditCard(card: (typeof activity.roommateCards)[number]) {
@@ -145,39 +142,42 @@ export default function UserDashboardPage({
     setCardMessage("");
   }
 
-  function saveCardEdit() {
+  async function saveCardEdit() {
     const rooms = Number(cardRooms);
     const price = Number(cardPrice);
     if (!editingCardId || !cardCity || !cardNeighborhood.trim() || rooms < 1 || price < 1) {
       setCardMessage("راجعي المدينة والحي وعدد الغرف والسعر.");
       return;
     }
-    const updated = updateRoommateCard(editingCardId, user.id, {
-      city: cardCity,
-      neighborhood: cardNeighborhood,
-      availableRooms: rooms,
-      pricePerPerson: price,
-      organization: cardOrganization,
-      bio: cardBio,
-    });
-    if (!updated) {
+    const current = activity.roommateCards.find((item) => item.request.id === editingCardId);
+    if (!current) return;
+    try {
+      await business.updateRoommateCard(editingCardId, {
+        ...current.request,
+        city: cardCity,
+        district: cardNeighborhood,
+        availableRooms: rooms,
+        pricePerPerson: price,
+        organization: cardOrganization,
+        bio: cardBio,
+      });
+    } catch {
       setCardMessage("تعذر تعديل البطاقة.");
       return;
     }
     setEditingCardId("");
     setCardMessage("تم تعديل البطاقة.");
-    setActivityVersion((version) => version + 1);
   }
 
-  function deleteCard(requestId: string) {
-    const deleted = deleteRoommateCard(requestId, user.id);
-    if (!deleted) {
+  async function deleteCard(requestId: string) {
+    try {
+      await business.closeRoommateCard(requestId);
+    } catch {
       setCardMessage("تعذر حذف البطاقة.");
       return;
     }
     setEditingCardId("");
     setCardMessage("تم حذف البطاقة.");
-    setActivityVersion((version) => version + 1);
   }
 
   return (

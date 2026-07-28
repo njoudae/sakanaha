@@ -13,3 +13,13 @@ apps/*/vite-dev.err
 /backups/
 /restore-work/
 .vercel/
+
+# Local Codex/agent workspace files
+/.agents/
+/.claude/
+/.codex-vite*.log
+/AGENTS.md
+/CLAUDE.md
+/skills-lock.json
+/screenshots/
+/docs/project-audit-2026-07-26.md

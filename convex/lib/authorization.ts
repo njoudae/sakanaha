@@ -8,7 +8,8 @@ export async function authenticatedIdentityKey(
   const runtimeIdentity = await ctx.auth.getUserIdentity();
   if (runtimeIdentity === null) return null;
   const identityKey = (runtimeIdentity as unknown as Record<string, unknown>).identityKey;
-  return typeof identityKey === "string" && identityKey.trim() ? identityKey.trim() : null;
+  if (typeof identityKey === "string" && identityKey.trim()) return identityKey.trim();
+  return runtimeIdentity.tokenIdentifier?.trim() || null;
 }
 
 export async function requireActiveProfile(

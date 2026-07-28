@@ -1,15 +1,11 @@
 export type FeatureFlagKey =
   | "auth.identityFoundation.enabled"
   | "auth.convexAuth.enabled"
-  | "auth.localLegacy.enabled"
   | "auth.google.enabled"
   | "auth.emailOtp.enabled"
   | "auth.phoneOtp.enabled"
   | "auth.apple.enabled"
   | "data.convex.enabled"
-  | "data.localStorageExport.enabled"
-  | "data.dualRead.enabled"
-  | "data.dualWrite.enabled"
   | "maps.universityDirections.enabled";
 
 export type FeatureFlagMap = Readonly<Record<FeatureFlagKey, boolean>>;
@@ -17,15 +13,11 @@ export type FeatureFlagMap = Readonly<Record<FeatureFlagKey, boolean>>;
 export const defaultFeatureFlags: FeatureFlagMap = {
   "auth.identityFoundation.enabled": true,
   "auth.convexAuth.enabled": false,
-  "auth.localLegacy.enabled": import.meta.env.DEV,
   "auth.google.enabled": false,
   "auth.emailOtp.enabled": false,
   "auth.phoneOtp.enabled": false,
   "auth.apple.enabled": false,
-  "data.convex.enabled": false,
-  "data.localStorageExport.enabled": true,
-  "data.dualRead.enabled": false,
-  "data.dualWrite.enabled": false,
+  "data.convex.enabled": true,
   "maps.universityDirections.enabled": true,
 };
 
@@ -44,10 +36,6 @@ export function getFeatureFlags(): FeatureFlagMap {
     "auth.convexAuth.enabled":
       envFlag("VITE_FEATURE_AUTH_CONVEX_AUTH_ENABLED") ??
       defaultFeatureFlags["auth.convexAuth.enabled"],
-    "auth.localLegacy.enabled":
-      !import.meta.env.PROD &&
-      (envFlag("VITE_FEATURE_AUTH_LOCAL_LEGACY_ENABLED") ??
-        defaultFeatureFlags["auth.localLegacy.enabled"]),
     "auth.google.enabled":
       envFlag("VITE_FEATURE_AUTH_GOOGLE_ENABLED") ?? defaultFeatureFlags["auth.google.enabled"],
     "auth.emailOtp.enabled":
@@ -59,12 +47,6 @@ export function getFeatureFlags(): FeatureFlagMap {
     "auth.apple.enabled": false,
     "data.convex.enabled":
       envFlag("VITE_FEATURE_DATA_CONVEX_ENABLED") ?? defaultFeatureFlags["data.convex.enabled"],
-    "data.dualRead.enabled":
-      envFlag("VITE_FEATURE_DATA_DUAL_READ_ENABLED") ??
-      defaultFeatureFlags["data.dualRead.enabled"],
-    "data.dualWrite.enabled":
-      envFlag("VITE_FEATURE_DATA_DUAL_WRITE_ENABLED") ??
-      defaultFeatureFlags["data.dualWrite.enabled"],
     "maps.universityDirections.enabled":
       envFlag("VITE_FEATURE_MAPS_UNIVERSITY_DIRECTIONS_ENABLED") ??
       defaultFeatureFlags["maps.universityDirections.enabled"],

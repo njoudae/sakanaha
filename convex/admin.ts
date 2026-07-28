@@ -1,7 +1,14 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/authorization";
-import { moderationStatus, platformRole, profileStatus } from "./validators";
+import { enqueueBusinessNotification, recordBusinessAudit } from "./lib/businessEvents";
+import {
+  bookingStatus,
+  moderationStatus,
+  paymentStatus,
+  platformRole,
+  profileStatus,
+} from "./validators";
 
 const COUNT_LIMIT = 1001;
 const LIST_LIMIT = 100;
@@ -54,6 +61,8 @@ export const overview = query({
     owners: countResult,
     properties: countResult,
     roommateRequests: countResult,
+    bookings: countResult,
+    payments: countResult,
     pendingPropertyApprovals: countResult,
     pendingRoommateApprovals: countResult,
     approved: countResult,
@@ -65,21 +74,31 @@ export const overview = query({
   }),
   handler: async (ctx) => {
     await requireAdmin(ctx);
-    const [users, owners, properties, roommateRequests, pendingProperties, pendingRoommates] =
-      await Promise.all([
-        ctx.db.query("userProfiles").order("desc").take(COUNT_LIMIT),
-        ctx.db.query("ownerProfiles").order("desc").take(COUNT_LIMIT),
-        ctx.db.query("properties").order("desc").take(COUNT_LIMIT),
-        ctx.db.query("roommateRequests").order("desc").take(COUNT_LIMIT),
-        ctx.db
-          .query("properties")
-          .withIndex("by_moderation_status", (q) => q.eq("moderationStatus", "pending"))
-          .take(COUNT_LIMIT),
-        ctx.db
-          .query("roommateRequests")
-          .withIndex("by_moderation_status", (q) => q.eq("moderationStatus", "pending"))
-          .take(COUNT_LIMIT),
-      ]);
+    const [
+      users,
+      owners,
+      properties,
+      roommateRequests,
+      bookings,
+      payments,
+      pendingProperties,
+      pendingRoommates,
+    ] = await Promise.all([
+      ctx.db.query("userProfiles").order("desc").take(COUNT_LIMIT),
+      ctx.db.query("ownerProfiles").order("desc").take(COUNT_LIMIT),
+      ctx.db.query("properties").order("desc").take(COUNT_LIMIT),
+      ctx.db.query("roommateRequests").order("desc").take(COUNT_LIMIT),
+      ctx.db.query("bookings").order("desc").take(COUNT_LIMIT),
+      ctx.db.query("payments").order("desc").take(COUNT_LIMIT),
+      ctx.db
+        .query("properties")
+        .withIndex("by_moderation_status", (q) => q.eq("moderationStatus", "pending"))
+        .take(COUNT_LIMIT),
+      ctx.db
+        .query("roommateRequests")
+        .withIndex("by_moderation_status", (q) => q.eq("moderationStatus", "pending"))
+        .take(COUNT_LIMIT),
+    ]);
     const liveProperties = properties.filter((item) => item.deletedAt === undefined);
     const liveRoommates = roommateRequests.filter((item) => item.deletedAt === undefined);
     const publicationStatuses = [
@@ -91,6 +110,8 @@ export const overview = query({
       owners: boundedCount(owners.filter((item) => item.status !== "deleted")),
       properties: boundedCount(liveProperties),
       roommateRequests: boundedCount(liveRoommates),
+      bookings: boundedCount(bookings),
+      payments: boundedCount(payments),
       pendingPropertyApprovals: boundedCount(
         pendingProperties.filter((item) => item.deletedAt === undefined),
       ),
@@ -293,7 +314,90 @@ export const updateUserStatus = mutation({
       newValue: { status: args.status },
       createdAt: now,
     });
+    await enqueueBusinessNotification(ctx, {
+      userId: target._id,
+      idempotencyKey: `user:${target._id}:status:${args.status}:${now}`,
+      type: "user.status_updated",
+      title: "تحديث حالة الحساب",
+      body: `تم تحديث حالة حسابك إلى ${args.status}.`,
+      deepLink: "/user/dashboard",
+    });
     return null;
+  },
+});
+
+export const updateUserRole = mutation({
+  args: {
+    userId: v.id("userProfiles"),
+    role: platformRole,
+    reason: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx);
+    const target = await ctx.db.get("userProfiles", args.userId);
+    if (target === null || target.status === "deleted") throw new Error("User not found.");
+    const reason = args.reason.trim().slice(0, 500);
+    if (!reason) throw new Error("A role-change reason is required.");
+    if (target._id === admin._id && args.role !== "admin") {
+      throw new Error("An administrator cannot remove their own administrator role.");
+    }
+    if (target.primaryRole === "admin" && args.role !== "admin") {
+      const activeAdmins = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_primary_role", (q) => q.eq("primaryRole", "admin"))
+        .take(2);
+      if (activeAdmins.filter((item) => item.status === "active").length <= 1) {
+        throw new Error("The last active administrator role cannot be removed.");
+      }
+    }
+    const now = Date.now();
+    await ctx.db.patch(target._id, { primaryRole: args.role, updatedAt: now });
+    await recordBusinessAudit(ctx, {
+      actorUserId: admin._id,
+      actorType: "admin",
+      action: "admin.user.role_updated",
+      entityType: "userProfiles",
+      entityId: target._id,
+      reason,
+      previousValue: { primaryRole: target.primaryRole },
+      newValue: { primaryRole: args.role },
+    });
+    await enqueueBusinessNotification(ctx, {
+      userId: target._id,
+      idempotencyKey: `user:${target._id}:role:${args.role}:${now}`,
+      type: "user.role_updated",
+      title: "تحديث صلاحية الحساب",
+      body: `تم تحديث صلاحية حسابك إلى ${args.role}.`,
+      deepLink: "/user/dashboard",
+    });
+    return null;
+  },
+});
+
+export const listBookings = query({
+  args: { status: v.optional(bookingStatus) },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const rows = await ctx.db.query("bookings").order("desc").take(LIST_LIMIT);
+    return rows.filter((item) => args.status === undefined || item.status === args.status);
+  },
+});
+
+export const listPayments = query({
+  args: { status: v.optional(paymentStatus) },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const rows = await ctx.db.query("payments").order("desc").take(LIST_LIMIT);
+    return rows.filter((item) => args.status === undefined || item.status === args.status);
+  },
+});
+
+export const listAuditEvents = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return await ctx.db.query("auditEvents").withIndex("by_created").order("desc").take(LIST_LIMIT);
   },
 });
 
@@ -376,6 +480,20 @@ export const moderateProperty = mutation({
       },
       createdAt: now,
     });
+    const owner = await ctx.db.get("ownerProfiles", property.ownerProfileId);
+    if (owner !== null) {
+      await enqueueBusinessNotification(ctx, {
+        userId: owner.userId,
+        idempotencyKey: `property:${property._id}:moderation:${args.moderation}:${now}`,
+        type: `property.moderation.${args.moderation}`,
+        title: approved ? "تم اعتماد العقار" : "تحديث مراجعة العقار",
+        body: approved
+          ? `تم اعتماد ونشر العقار: ${property.title}`
+          : args.reason?.trim() || `تم تحديث حالة العقار إلى ${args.moderation}.`,
+        deepLink: "/owner/dashboard",
+        relatedPropertyId: property._id,
+      });
+    }
     return null;
   },
 });
@@ -397,7 +515,19 @@ export const moderateRoommateRequest = mutation({
       throw new Error("A rejection or change-request reason is required.");
     }
     const now = Date.now();
+    const approved = args.moderation === "approved";
+    const archived = args.moderation === "archived";
     await ctx.db.patch(request._id, {
+      workflowStatus: approved
+        ? "published"
+        : archived
+          ? "archived"
+          : args.moderation === "needs_review"
+            ? "changes_requested"
+            : args.moderation === "rejected"
+              ? "rejected"
+              : "pending_admin_review",
+      status: approved ? "open" : "hidden",
       moderationStatus: args.moderation,
       publicationStatus:
         args.moderation === "approved"
@@ -410,6 +540,7 @@ export const moderateRoommateRequest = mutation({
       rejectionReason: reasonRequired(args.moderation) ? args.reason!.trim() : undefined,
       reviewedAt: now,
       reviewedByUserId: admin._id,
+      submittedAt: request.submittedAt,
       updatedAt: now,
     });
     await ctx.db.insert("auditEvents", {
@@ -428,9 +559,29 @@ export const moderateRoommateRequest = mutation({
         workflowStatus: request.workflowStatus ?? request.publicationStatus,
         moderationStatus: request.moderationStatus,
       },
-      newValue: { moderationStatus: args.moderation },
+      newValue: {
+        workflowStatus: approved
+          ? "published"
+          : archived
+            ? "archived"
+            : args.moderation === "needs_review"
+              ? "changes_requested"
+              : args.moderation,
+        moderationStatus: args.moderation,
+      },
       metadata: { moderationStatus: args.moderation, reason: args.reason },
       createdAt: now,
+    });
+    await enqueueBusinessNotification(ctx, {
+      userId: request.userId,
+      idempotencyKey: `roommate:${request._id}:moderation:${args.moderation}:${now}`,
+      type: `roommate.moderation.${args.moderation}`,
+      title: approved ? "تم اعتماد بطاقة شريكة السكن" : "تحديث مراجعة البطاقة",
+      body: approved
+        ? "تم اعتماد ونشر بطاقة شريكة السكن."
+        : args.reason?.trim() || `تم تحديث حالة البطاقة إلى ${args.moderation}.`,
+      deepLink: "/user/dashboard",
+      relatedPropertyId: request.linkedPropertyId,
     });
     return null;
   },
@@ -551,6 +702,18 @@ export const setPropertyOperationalStatus = mutation({
       newValue: { workflowStatus: args.status },
       createdAt: now,
     });
+    const owner = await ctx.db.get("ownerProfiles", property.ownerProfileId);
+    if (owner !== null) {
+      await enqueueBusinessNotification(ctx, {
+        userId: owner.userId,
+        idempotencyKey: `property:${property._id}:operational:${args.status}:${now}`,
+        type: `property.operational.${args.status}`,
+        title: "تحديث حالة العقار",
+        body: reason,
+        deepLink: "/owner/dashboard",
+        relatedPropertyId: property._id,
+      });
+    }
     return null;
   },
 });
@@ -573,6 +736,9 @@ export const setRoommateCardOperationalStatus = mutation({
     if (request === null) throw new Error("Roommate card not found.");
     const reason = args.reason.trim();
     if (!reason) throw new Error("A reason is required.");
+    if (args.status === "published" && request.workflowStatus !== "suspended") {
+      throw new Error("Only a suspended roommate card can be restored.");
+    }
     const now = Date.now();
     await ctx.db.patch(request._id, {
       workflowStatus: args.status,
@@ -596,6 +762,15 @@ export const setRoommateCardOperationalStatus = mutation({
       previousValue: { workflowStatus: request.workflowStatus ?? request.publicationStatus },
       newValue: { workflowStatus: args.status },
       createdAt: now,
+    });
+    await enqueueBusinessNotification(ctx, {
+      userId: request.userId,
+      idempotencyKey: `roommate:${request._id}:operational:${args.status}:${now}`,
+      type: `roommate.operational.${args.status}`,
+      title: "تحديث حالة بطاقة شريكة السكن",
+      body: reason,
+      deepLink: "/user/dashboard",
+      relatedPropertyId: request.linkedPropertyId,
     });
     return null;
   },

@@ -6,10 +6,9 @@ afterEach(() => {
 });
 
 describe("authentication feature flags", () => {
-  it("cannot enable legacy local authentication in production", () => {
+  it("keeps Convex as the production business data source", () => {
     vi.stubEnv("PROD", true);
-    vi.stubEnv("VITE_FEATURE_AUTH_LOCAL_LEGACY_ENABLED", "true");
-    expect(getFeatureFlags()["auth.localLegacy.enabled"]).toBe(false);
+    expect(getFeatureFlags()["data.convex.enabled"]).toBe(true);
   });
 
   it("keeps production-provider switches disabled by default", () => {

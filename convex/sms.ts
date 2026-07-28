@@ -7,6 +7,7 @@ import {
   exponentialBackoffDelayMs,
   type ActiveSmsProviderName,
   type MessageSendResult,
+  type SmsDeliveryStatus,
   type SmsProvider,
   type SmsProviderConfig,
 } from "@saknaha/providers";
@@ -15,6 +16,7 @@ import { internal } from "./_generated/api";
 import { internalAction } from "./_generated/server";
 
 const DEFAULT_OTP_TEMPLATE = "Your Saknaha verification code is {{code}}.";
+type StoredSmsStatus = SmsDeliveryStatus | "undelivered" | "cancelled";
 
 function missingCredential(provider: ActiveSmsProviderName, name: string): never {
   throw new Error(`${provider} SMS credential ${name} is not configured.`);
@@ -101,7 +103,14 @@ export const sendOtpSms = internalAction({
     userId: v.optional(v.id("userProfiles")),
     ipHash: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    status: StoredSmsStatus;
+    providerMessageId?: string;
+    duplicate: boolean;
+  }> => {
     if (process.env.AUTH_PHONE_OTP_ENABLED !== "true") {
       throw new Error("Phone OTP is disabled.");
     }
@@ -119,7 +128,7 @@ export const sendOtpSms = internalAction({
       throw new Error("No SMS provider is configured.");
     }
 
-    const reserved = await ctx.runMutation(internal.smsState.reserveSmsMessage, {
+    const reserved = (await ctx.runMutation(internal.smsState.reserveSmsMessage, {
       provider: providerOrder[0],
       userId: args.userId,
       purpose: "otp",
@@ -135,7 +144,12 @@ export const sendOtpSms = internalAction({
       perIpHourlyLimit: config.perIpHourlyLimit,
       perIpDailyLimit: config.perIpDailyLimit,
       destinationAccountHourlyLimit: config.destinationAccountHourlyLimit,
-    });
+    })) as {
+      messageId: import("./_generated/dataModel").Id<"smsMessages">;
+      duplicate: boolean;
+      status: StoredSmsStatus;
+      providerMessageId?: string;
+    };
 
     if (reserved.duplicate) {
       return {

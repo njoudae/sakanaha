@@ -30,11 +30,8 @@ Feature flags control staged rollout, rollback, provider switching, and producti
 | `auth.emailOtp.enabled`             | release    | `false`  | Enables Email OTP.                                                                         |
 | `auth.phoneOtp.enabled`             | release    | `false`  | Enables optional Phone OTP.                                                                |
 | `auth.apple.enabled`                | release    | `false`  | Keeps Apple Sign In disabled by default.                                                   |
-| `data.convex.enabled`               | migration  | `false`  | Reads production data from Convex.                                                         |
-| `data.localStorageExport.enabled`   | migration  | `true`   | Allows users/dev tools to export current localStorage data before migration.               |
-| `data.dualRead.enabled`             | migration  | `false`  | Allows controlled fallback reads during migration.                                         |
-| `data.dualWrite.enabled`            | migration  | `false`  | Allows controlled writes to old and new stores during migration.                           |
-| `maps.enabled`                      | release    | `false`  | Enables production maps module.                                                            |
+| `data.convex.enabled`               | release    | `true`   | Uses Convex as the only production business-data source.                                   |
+| `maps.universityDirections.enabled` | release    | `true`   | Enables university-to-property direction links.                                            |
 | `maps.provider`                     | provider   | `google` | Selects `google`, `mapbox`, or `openstreetmap`.                                            |
 | `maps.paidCalls.enabled`            | killSwitch | `false`  | Enables paid provider calls.                                                               |
 | `sms.enabled`                       | release    | `false`  | Enables SMS delivery.                                                                      |
@@ -83,5 +80,5 @@ The exact file location belongs to M2/M4, once package boundaries and Convex are
 
 - Disable the module flag before changing provider credentials.
 - For paid providers, disable the paid-call kill switch first.
-- For migration flags, stop writes before changing reads.
+- Production business data has no migration, dual-read, or browser-storage fallback flag.
 - For auth flags, keep at least one tested login method enabled in staging before production rollout.

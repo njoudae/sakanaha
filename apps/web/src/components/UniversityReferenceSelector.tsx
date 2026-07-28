@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { mockUniversitiesCatalog } from "@saknaha/constants/mockUniversities";
 import type { UniversityLocation } from "@saknaha/shared-types";
 import { isValidCoordinates } from "@saknaha/utils/directions";
 import { useAuthService } from "../auth";
@@ -42,11 +41,6 @@ export default function UniversityReferenceSelector({
           },
         ]),
     );
-    for (const university of mockUniversitiesCatalog) {
-      if (university.active && (!city || city === "all" || university.city === city)) {
-        if (!fromBranches.has(university.id)) fromBranches.set(university.id, university);
-      }
-    }
     return [...fromBranches.values()];
   }, [availableBranches, city]);
   const [universityId, setUniversityId] = useState(

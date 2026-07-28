@@ -14,7 +14,7 @@ import RoommatePreferencesFields from "../components/RoommatePreferencesFields";
 import UniversityReferenceSelector from "../components/UniversityReferenceSelector";
 import { useAuthService } from "../auth";
 import { useMapsData } from "../data/MapsDataContext";
-import { addRoommateRequest, getUserActivity } from "../services/propertyService";
+import { useBusinessData } from "../data/BusinessDataContext";
 import { defaultRoommatePreferences } from "../services/roommatePreferenceDefaults";
 
 interface RoommateCreatePageProps {
@@ -26,10 +26,6 @@ interface RoommateCreatePageProps {
 
 type LocationMethod = "current" | "link" | "map";
 
-function externalHousingFormSnapshot(property: Property): Property {
-  return property;
-}
-
 export default function RoommateCreatePage({
   user,
   initialCity,
@@ -38,16 +34,17 @@ export default function RoommateCreatePage({
 }: RoommateCreatePageProps) {
   const authService = useAuthService();
   const mapsData = useMapsData();
+  const business = useBusinessData();
   const eligibleProperties = useMemo(() => {
     const seen = new Set<string>();
-    return getUserActivity(user.id)
-      .interests.map((item) => item.property)
+    return business.activity.interests
+      .map((item) => item.property)
       .filter((property): property is Property => {
         if (!property || seen.has(property.id)) return false;
         seen.add(property.id);
         return true;
       });
-  }, [user.id]);
+  }, [business.activity]);
   const [source, setSource] = useState<RoommateCardSource | null>(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
   const [city, setCity] = useState(initialCity || user.city || "أبها");
@@ -107,7 +104,7 @@ export default function RoommateCreatePage({
     );
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!source) return;
 
@@ -118,67 +115,9 @@ export default function RoommateCreatePage({
 
     const rooms = Math.max(1, Number(availableRooms) || 1);
     const externalPricePerPerson = Math.max(0, Number(pricePerPerson) || 0);
-    const linkedProperty =
-      selectedProperty ??
-      externalHousingFormSnapshot({
-        id: "",
-        ownerId: user.id,
-        ownerName: user.name,
-        ownerPhone: user.phone,
-        title: `سكن خارجي في ${city}`,
-        propertyLicenseNumber: "سكن خارجي",
-        region: "",
-        city,
-        neighborhood: neighborhood.trim() || "غير محدد",
-        district: neighborhood.trim() || "غير محدد",
-        landmark: landmark.trim(),
-        address: neighborhood.trim() || city,
-        universityNearby:
-          selectedUniversity?.label ?? selectedUniversity?.universityName ?? "غير محدد",
-        googleMapsUrl,
-        lat,
-        lng,
-        locationVisibility: "approximate",
-        classification: "متاح للجميع",
-        propertyType,
-        minRooms: rooms,
-        maxRooms: rooms,
-        floorsCount: 1,
-        hasElevator: false,
-        hasCleaningWorker: false,
-        features: [],
-        facilities: [],
-        rentIncludes: [],
-        hasTransportService: false,
-        universityBusPasses: false,
-        bathrooms: 1,
-        furnished: true,
-        maxResidents: rooms,
-        totalUnits: rooms,
-        availableUnits: rooms,
-        availabilityStatus: "available",
-        roommateAllowed: true,
-        requiresLeaseContract: true,
-        price: externalPricePerPerson * rooms,
-        paymentType: "شهري",
-        rentalPrices: { monthly: externalPricePerPerson * rooms },
-        negotiable: false,
-        allowWhatsappContact: true,
-        deposit: 0,
-        priceNotes: "",
-        services: [],
-        images: [],
-        videos: [],
-        status: "draft",
-        publicationStatus: "draft",
-        distanceText: "",
-        timeText: "",
-        createdAt: new Date().toISOString(),
-      });
-
     const submittedAt = new Date().toISOString();
-    const card = addRoommateRequest({
-      propertyId: linkedProperty.id,
+    await business.createRoommateCard({
+      propertyId: selectedProperty?.id ?? "",
       userId: user.id,
       requesterName: user.name,
       userType: user.role,
@@ -188,7 +127,7 @@ export default function RoommateCreatePage({
       bio: bio.trim(),
       availableRooms: rooms,
       source,
-      linkedPropertyId: source === "saknaha_property" ? linkedProperty.id : undefined,
+      linkedPropertyId: source === "saknaha_property" ? selectedProperty?.id : undefined,
       externalHousing:
         source === "external_property"
           ? {
@@ -202,22 +141,18 @@ export default function RoommateCreatePage({
           : undefined,
       pricePerPerson: source === "saknaha_property" ? listedPrice : externalPricePerPerson,
       preferences,
-      region: linkedProperty.region,
-      city: linkedProperty.city,
-      district: linkedProperty.neighborhood,
-      landmark: linkedProperty.landmark,
+      region: selectedProperty?.region,
+      city: selectedProperty?.city ?? city,
+      district: selectedProperty?.neighborhood ?? neighborhood.trim(),
+      landmark: selectedProperty?.landmark ?? landmark.trim(),
       universityBranchId: selectedUniversity?.id,
-      approximateLat: linkedProperty.lat,
-      approximateLng: linkedProperty.lng,
+      approximateLat: selectedProperty?.lat ?? lat,
+      approximateLng: selectedProperty?.lng ?? lng,
       publicationStatus: "pending_review",
       submittedAt,
     });
 
-    window.alert(
-      card.publicationStatus === "approved"
-        ? "تمت الموافقة على البطاقة ونشرها مباشرة. ستظهر الآن في الصفحة الرئيسية."
-        : "اكتملت معاينة دفع 15 ريال وتم إرسال البطاقة للمراجعة.",
-    );
+    window.alert("تم حفظ بطاقة شريكة السكن في Convex. يلزم تأكيد الدفع قبل النشر.");
     onDone();
   }
 

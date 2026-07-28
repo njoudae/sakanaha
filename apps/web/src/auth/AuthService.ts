@@ -9,7 +9,7 @@ export interface AuthCapabilities {
 }
 
 export interface AuthService {
-  readonly kind: "localStorage" | "convex";
+  readonly kind: "convex";
   readonly capabilities: AuthCapabilities;
   readonly universityBranches: readonly UniversityLocation[];
   readonly selectedUniversityBranch: UniversityLocation | null;

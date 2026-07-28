@@ -50,7 +50,7 @@ describe("admin dashboard API", () => {
       const ownerProfileId = await ctx.db.insert("ownerProfiles", {
         userId: user.profileId,
         fullName: "Owner",
-        phone: "0500000000",
+        phone: "test-owner-phone",
         verificationStatus: "verified",
         status: "active",
         createdAt: now,

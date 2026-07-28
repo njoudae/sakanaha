@@ -19,18 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import Badge from "../components/Badge";
 import PropertyLocationMap from "../components/PropertyLocationMap";
 import RoommateRequestForm from "../components/RoommateRequestForm";
-import {
-  addInterest,
-  addRoommatePreference,
-  getOwnerSubmittedPublishedProperties,
-  getProperties,
-  getPropertyById,
-  getPublicPropertyById,
-  isFavoriteProperty,
-  recordPropertyView,
-  reservePropertyUnit,
-  toggleFavoriteProperty,
-} from "../services/propertyService";
+import { useBusinessData } from "../data/BusinessDataContext";
 import { getAvailabilityStatus, getAvailableUnits } from "../services/propertyAvailability";
 import type { Property, UniversityLocation, User } from "@saknaha/shared-types";
 import { absoluteAppUrl, cityPath, propertyPath } from "../utils/routes";
@@ -87,20 +76,18 @@ export default function PropertyDetailsPage({
   selectedUniversity,
   onUniversityChange,
 }: PropertyDetailsPageProps) {
+  const business = useBusinessData();
   const isOwnerPreview = mode === "owner-preview";
-  const property = isOwnerPreview ? getPropertyById(propertyId) : getPublicPropertyById(propertyId);
-  const userId = user?.id ?? "guest-user";
+  const property = (isOwnerPreview ? business.ownerProperties : business.properties).find(
+    (item) => item.id === propertyId,
+  );
   const [message, setMessage] = useState("");
   const [imageIndex, setImageIndex] = useState(0);
   const [fullScreenOpen, setFullScreenOpen] = useState(false);
   const [showRoommateForm, setShowRoommateForm] = useState(false);
-  const [favorite, setFavorite] = useState(() =>
-    property ? isFavoriteProperty(property.id, userId) : false,
+  const [favorite, setFavorite] = useState(
+    property ? business.favoritePropertyIds.includes(property.id) : false,
   );
-
-  useEffect(() => {
-    if (property && !isOwnerPreview) recordPropertyView(property.id, userId);
-  }, [isOwnerPreview, property, userId]);
 
   useEffect(() => {
     if (!fullScreenOpen) return;
@@ -118,14 +105,10 @@ export default function PropertyDetailsPage({
 
   const sameCityProperties = useMemo(() => {
     if (!property) return [];
-    const ownerProperties = getOwnerSubmittedPublishedProperties();
-    const source =
-      ownerProperties.length > 0
-        ? ownerProperties
-        : getProperties().filter((item) => item.ownerId !== "mock-owner");
+    const source = isOwnerPreview ? business.ownerProperties : business.properties;
     const sameCity = source.filter((item) => item.city === property.city);
     return sameCity.some((item) => item.id === property.id) ? sameCity : [property, ...sameCity];
-  }, [property]);
+  }, [business.ownerProperties, business.properties, isOwnerPreview, property]);
 
   if (!property) {
     return (
@@ -153,31 +136,18 @@ export default function PropertyDetailsPage({
   const availableUnits = getAvailableUnits(currentProperty);
   const availabilityStatus = getAvailabilityStatus(currentProperty);
 
-  function recordInterest(mode: "whole-unit" | "roommate" | "visit" | "general") {
-    if (mode === "whole-unit") {
-      const reservation = reservePropertyUnit({
-        propertyId: currentProperty.id,
-        userId,
-      });
-      if (reservation.status === "full") {
-        setMessage("عذرًا، جميع الوحدات ممتلئة حاليًا.");
-      } else if (reservation.status === "already_reserved") {
-        setMessage("لديك حجز مسجل مسبقًا لهذه الوحدة.");
-      } else {
-        setMessage(
-          `تم تسجيل الحجز. الوحدات المتبقية: ${reservation.availableUnits.toLocaleString("ar-SA")}.`,
-        );
-      }
+  async function recordInterest(mode: "whole-unit" | "roommate" | "visit" | "general") {
+    if (!user) {
+      setMessage("سجلي الدخول أولاً لإكمال الطلب.");
       return;
     }
-    addInterest({ propertyId: currentProperty.id, userId, mode });
+    if (mode === "whole-unit") {
+      await business.requestBooking(currentProperty.id);
+      setMessage("تم إرسال طلب الحجز إلى مالك العقار.");
+      return;
+    }
+    await business.registerPropertyInterest(currentProperty.id, mode);
     if (mode === "roommate") {
-      addRoommatePreference({
-        propertyId: currentProperty.id,
-        userId,
-        roomsWanted: 1,
-        acceptsSharedContract: true,
-      });
       setMessage(
         "تم تسجيل اهتمامك بالروم ميت. سيتم حفظ الطلب ضمن بيانات السكن والمدينة للمتابعة لاحقًا.",
       );
@@ -210,8 +180,14 @@ export default function PropertyDetailsPage({
     }
   }
 
-  function toggleFavorite() {
-    setFavorite(toggleFavoriteProperty(currentProperty, userId));
+  async function toggleFavorite() {
+    if (!user) {
+      setMessage("سجلي الدخول أولاً لحفظ المفضلة.");
+      return;
+    }
+    const next = !favorite;
+    await business.setFavorite(currentProperty.id, next);
+    setFavorite(next);
     setMessage("تم تحديث المفضلة. هذا يساعد مستقبلًا في فهم الاهتمام حسب المدينة.");
   }
 
@@ -560,13 +536,7 @@ export default function PropertyDetailsPage({
               property={currentProperty}
               user={user}
               onDone={() => {
-                addInterest({ propertyId: currentProperty.id, userId, mode: "roommate" });
-                addRoommatePreference({
-                  propertyId: currentProperty.id,
-                  userId,
-                  roomsWanted: 1,
-                  acceptsSharedContract: true,
-                });
+                void business.registerPropertyInterest(currentProperty.id, "roommate");
                 setMessage("تم حفظ طلبك للبحث عن شريكة سكن. سيظهر ضمن صفحة الباحثات عن شريكة سكن.");
               }}
             />

@@ -39,8 +39,14 @@ export function getPropertyCardPresentation(property: Property): PropertyCardPre
   };
 }
 
-export function getRoommatePricePerPerson(request: RoommateRequest, property: Property): number {
-  return request.pricePerPerson ?? Math.ceil(property.price / Math.max(1, property.maxResidents));
+export function getRoommatePricePerPerson(
+  request: RoommateRequest,
+  property: Property | null,
+): number {
+  return (
+    request.pricePerPerson ??
+    (property ? Math.ceil(property.price / Math.max(1, property.maxResidents)) : 0)
+  );
 }
 
 export function getRoommateRequesterName(request: RoommateRequest): string {

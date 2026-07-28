@@ -28,13 +28,18 @@ export const roommateCardWorkflowStatus = v.union(
   v.literal("draft"),
   v.literal("pending_payment"),
   v.literal("paid"),
+  v.literal("pending_admin_review"),
+  v.literal("changes_requested"),
+  v.literal("rejected"),
   v.literal("published"),
+  v.literal("archived"),
   v.literal("suspended"),
   v.literal("hidden"),
   v.literal("deleted"),
 );
 
 export const paymentStatus = v.union(
+  v.literal("unpaid"),
   v.literal("pending"),
   v.literal("paid"),
   v.literal("failed"),
@@ -42,7 +47,19 @@ export const paymentStatus = v.union(
   v.literal("cancelled"),
 );
 
-export const paymentEntityType = v.union(v.literal("property"), v.literal("roommate_card"));
+export const paymentEntityType = v.union(
+  v.literal("property"),
+  v.literal("roommate_card"),
+  v.literal("booking"),
+);
+
+export const bookingStatus = v.union(
+  v.literal("requested"),
+  v.literal("confirmed"),
+  v.literal("rejected"),
+  v.literal("cancelled"),
+  v.literal("completed"),
+);
 
 export const identityStatus = v.union(v.literal("active"), v.literal("revoked"));
 

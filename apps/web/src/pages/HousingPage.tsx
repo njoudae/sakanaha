@@ -3,14 +3,8 @@ import { useMemo, useState } from "react";
 import PropertyCard from "../components/PropertyCard";
 import RoommateListingCard from "../components/RoommateListingCard";
 import { cityNames } from "@saknaha/constants/cities";
-import {
-  getPublishedProperties,
-  getPropertyById,
-  getRoommateRequests,
-  isFavoriteProperty,
-  toggleFavoriteProperty,
-} from "../services/propertyService";
-import type { Property, RoommateRequest, User } from "@saknaha/shared-types";
+import { useBusinessData } from "../data/BusinessDataContext";
+import type { Property, User } from "@saknaha/shared-types";
 import { absoluteAppUrl, propertyPath } from "../utils/routes";
 
 interface HousingPageProps {
@@ -22,11 +16,6 @@ interface HousingPageProps {
   onHome: () => void;
 }
 
-interface RoommateListing {
-  request: RoommateRequest;
-  property: Property;
-}
-
 export default function HousingPage({
   user,
   initialCity = "all",
@@ -35,17 +24,16 @@ export default function HousingPage({
   onRoommates,
   onHome,
 }: HousingPageProps) {
+  const business = useBusinessData();
   const [city, setCity] = useState(initialCity);
   const [visibleCount, setVisibleCount] = useState(12);
   const [notice, setNotice] = useState("");
-  const userId = user?.id ?? "guest-user";
-
   const properties = useMemo(() => {
-    return getPublishedProperties().filter((property) => {
+    return business.properties.filter((property) => {
       if (city !== "all" && property.city !== city) return false;
       return true;
     });
-  }, [city]);
+  }, [business.properties, city]);
 
   async function shareProperty(property: Property) {
     const url = absoluteAppUrl(propertyPath(property.id));
@@ -62,17 +50,18 @@ export default function HousingPage({
   }
 
   function toggleFavorite(property: Property) {
-    toggleFavoriteProperty(property, userId);
+    if (user) {
+      void business.setFavorite(property.id, !business.favoritePropertyIds.includes(property.id));
+    }
     setNotice(user ? "تم تحديث المفضلة." : "سجلي الدخول لحفظ المفضلة على كل أجهزتك.");
   }
 
   const visibleProperties = properties.slice(0, visibleCount);
-  const roommateListings = getRoommateRequests()
-    .map((request) => {
-      const property = getPropertyById(request.propertyId);
-      return property ? { request, property } : null;
-    })
-    .filter(Boolean) as RoommateListing[];
+  const roommateListings = business.roommateRequests.map((request) => {
+    const property =
+      business.properties.find((item) => item.id === request.linkedPropertyId) ?? null;
+    return { request, property };
+  });
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-12" dir="rtl">
@@ -133,7 +122,7 @@ export default function HousingPage({
               key={property.id}
               property={property}
               onView={() => onProperty(property.id)}
-              isFavorite={isFavoriteProperty(property.id, userId)}
+              isFavorite={business.favoritePropertyIds.includes(property.id)}
               onFavorite={toggleFavorite}
               onShare={shareProperty}
             />

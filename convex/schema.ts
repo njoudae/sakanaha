@@ -27,6 +27,7 @@ import {
   otpChannel,
   otpStatus,
   ownerStatus,
+  bookingStatus,
   paymentEntityType,
   paymentStatus,
   platformRole,
@@ -102,6 +103,7 @@ export default defineSchema(
       primaryRole: platformRole,
       userType: v.optional(userType),
       city: v.optional(v.string()),
+      district: v.optional(v.string()),
       monthlyBudget: v.optional(v.number()),
       acceptsRoommate: v.optional(v.boolean()),
       roommatePreferences: v.optional(
@@ -276,6 +278,7 @@ export default defineSchema(
             v.literal("cleaning_worker"),
             v.literal("security_cameras"),
             v.literal("elevator"),
+            v.literal("self_check_in"),
           ),
         ),
       ),
@@ -286,6 +289,13 @@ export default defineSchema(
             v.literal("grocery"),
             v.literal("supermarket"),
             v.literal("malls"),
+            v.literal("food_supply"),
+            v.literal("mall"),
+            v.literal("salon"),
+            v.literal("bus_station"),
+            v.literal("train_station"),
+            v.literal("pharmacy"),
+            v.literal("clinics"),
           ),
         ),
       ),
@@ -567,11 +577,55 @@ export default defineSchema(
       .index("by_linked_property", ["linkedPropertyId"])
       .index("by_legacy_request", ["legacyRequestId"]),
 
+    roommateInterests: defineTable({
+      requesterUserId: v.id("userProfiles"),
+      roommateRequestId: v.id("roommateRequests"),
+      status: v.union(v.literal("registered"), v.literal("withdrawn")),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_requester_and_request", ["requesterUserId", "roommateRequestId"])
+      .index("by_request_and_status", ["roommateRequestId", "status"])
+      .index("by_requester_and_status", ["requesterUserId", "status"]),
+
+    bookings: defineTable({
+      propertyId: v.id("properties"),
+      requesterUserId: v.id("userProfiles"),
+      ownerProfileId: v.id("ownerProfiles"),
+      status: bookingStatus,
+      startDate: v.string(),
+      endDate: v.optional(v.string()),
+      pricingPeriod: v.union(
+        v.literal("daily"),
+        v.literal("weekly"),
+        v.literal("monthly"),
+        v.literal("term"),
+        v.literal("academic_year"),
+        v.literal("yearly"),
+      ),
+      amount: v.number(),
+      currency: v.string(),
+      note: v.optional(v.string()),
+      ownerReason: v.optional(v.string()),
+      paymentStatus: paymentStatus,
+      confirmedAt: v.optional(v.number()),
+      cancelledAt: v.optional(v.number()),
+      completedAt: v.optional(v.number()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_requester_and_status", ["requesterUserId", "status"])
+      .index("by_requester_and_property_and_status", ["requesterUserId", "propertyId", "status"])
+      .index("by_owner_and_status", ["ownerProfileId", "status"])
+      .index("by_property_and_status", ["propertyId", "status"])
+      .index("by_status_and_created", ["status", "createdAt"]),
+
     payments: defineTable({
       userId: v.id("userProfiles"),
       entityType: paymentEntityType,
       propertyId: v.optional(v.id("properties")),
       roommateRequestId: v.optional(v.id("roommateRequests")),
+      bookingId: v.optional(v.id("bookings")),
       provider: v.string(),
       providerReference: v.optional(v.string()),
       idempotencyKey: v.string(),
@@ -586,6 +640,7 @@ export default defineSchema(
       .index("by_provider_reference", ["provider", "providerReference"])
       .index("by_property_and_status", ["propertyId", "status"])
       .index("by_roommate_request_and_status", ["roommateRequestId", "status"])
+      .index("by_booking_and_status", ["bookingId", "status"])
       .index("by_user_and_status", ["userId", "status"]),
 
     negotiationSignals: defineTable({

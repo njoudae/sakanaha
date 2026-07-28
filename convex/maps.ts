@@ -4,6 +4,7 @@ import {
   createMapboxMapsProvider,
   createOpenStreetMapProvider,
   createProviderConfiguration,
+  type AddressResult,
   type GeoPoint,
   type MapsRequestContext,
   type MapsProvider,
@@ -138,9 +139,9 @@ function createProvider(
   return null;
 }
 
-function createConfiguredProvider(ctx: ActionCtx) {
+function createConfiguredProvider(ctx: ActionCtx): MapsProvider {
   const config = createProviderConfiguration(process.env).maps;
-  const runtime = {
+  const runtime: Parameters<typeof createGoogleMapsProvider>[0] = {
     fetch: (url: string, init?: RequestInit) => fetch(url, init),
     usageReporter: async (event: ProviderUsageEvent) => {
       await ctx.runMutation(internal.mapsUsage.recordProviderUsage, {
@@ -187,7 +188,7 @@ function createConfiguredProvider(ctx: ActionCtx) {
     },
   };
 
-  const providers = providerPriority(config.provider, config.fallbackProviders)
+  const providers: MapsProvider[] = providerPriority(config.provider, config.fallbackProviders)
     .map((provider) => createProvider(provider, runtime, config.paidCallsEnabled))
     .filter((provider): provider is MapsProvider => provider !== null);
 
@@ -208,7 +209,7 @@ export const geocode = action({
     context,
   },
   returns: v.array(addressResult),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<AddressResult[]> => {
     const normalizedQuery = args.query.trim();
     if (
       normalizedQuery.length < 3 ||
@@ -270,7 +271,7 @@ export const reverseGeocode = action({
     context,
   },
   returns: v.array(addressResult),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<AddressResult[]> => {
     assertValidPoint(args.point);
     assertValidContext(args.context);
     const provider = createConfiguredProvider(ctx);

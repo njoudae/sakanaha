@@ -49,9 +49,16 @@ export const ensureCurrent = mutation({
       .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
       .first();
     if (existing !== null) {
+      const runtimeIdentity = await ctx.auth.getUserIdentity();
       if (!existing.publicCode) {
         await ctx.db.patch(existing._id, {
+          identityKey: runtimeIdentity?.tokenIdentifier,
           publicCode: await nextPublicCode(ctx),
+          updatedAt: Date.now(),
+        });
+      } else if (!existing.identityKey && runtimeIdentity?.tokenIdentifier) {
+        await ctx.db.patch(existing._id, {
+          identityKey: runtimeIdentity.tokenIdentifier,
           updatedAt: Date.now(),
         });
       }
@@ -96,9 +103,11 @@ export const ensureCurrent = mutation({
       }
     }
 
+    const runtimeIdentity = await ctx.auth.getUserIdentity();
     return await ctx.db.insert("userProfiles", {
       authUserId,
       authSubject: `convex:${authUserId}`,
+      identityKey: runtimeIdentity?.tokenIdentifier,
       publicCode: await nextPublicCode(ctx),
       name: displayNameFromAuthUser(authUser),
       email: authUser.email,

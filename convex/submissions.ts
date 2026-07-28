@@ -113,12 +113,12 @@ export const submitRoommateRequestForReview = mutation({
     }
     const now = Date.now();
     await ctx.db.patch(request._id, {
-      workflowStatus: request.paymentStatus === "paid" ? "published" : "pending_payment",
-      publicationStatus: request.paymentStatus === "paid" ? "approved" : "draft",
-      moderationStatus: request.paymentStatus === "paid" ? "approved" : "pending",
+      workflowStatus: request.paymentStatus === "paid" ? "pending_admin_review" : "pending_payment",
+      publicationStatus: request.paymentStatus === "paid" ? "pending_review" : "draft",
+      moderationStatus: "pending",
       rejectionReason: undefined,
       submittedAt: now,
-      reviewedAt: request.paymentStatus === "paid" ? now : undefined,
+      reviewedAt: undefined,
       reviewedByUserId: undefined,
       updatedAt: now,
     });
@@ -127,13 +127,14 @@ export const submitRoommateRequestForReview = mutation({
       actorType: "user",
       action:
         request.paymentStatus === "paid"
-          ? "roommate_request.published_after_verified_payment"
+          ? "roommate_request.submitted_for_review"
           : "roommate_request.payment_requested",
       targetTable: "roommateRequests",
       targetId: request._id,
       previousValue: { workflowStatus: request.workflowStatus ?? request.publicationStatus },
       newValue: {
-        workflowStatus: request.paymentStatus === "paid" ? "published" : "pending_payment",
+        workflowStatus:
+          request.paymentStatus === "paid" ? "pending_admin_review" : "pending_payment",
       },
       timestamp: now,
       createdAt: now,

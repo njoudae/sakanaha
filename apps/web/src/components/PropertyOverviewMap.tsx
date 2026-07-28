@@ -1,14 +1,17 @@
 import { MapPin } from "lucide-react";
 import type { Property, UniversityLocation } from "@saknaha/shared-types";
 
-interface MockMapProps {
+interface PropertyOverviewMapProps {
   properties: Property[];
   selectedUniversity?: UniversityLocation | null;
 }
 
 const markerColors = ["#7f3b75", "#25856f", "#4f8aa8", "#b86b5a", "#6b5b95"];
 
-export default function MockMap({ properties, selectedUniversity }: MockMapProps) {
+export default function PropertyOverviewMap({
+  properties,
+  selectedUniversity,
+}: PropertyOverviewMapProps) {
   const visibleProperties = properties.slice(0, 5);
 
   return (

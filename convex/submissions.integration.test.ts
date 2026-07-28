@@ -26,7 +26,7 @@ describe("M19 submission workflow", () => {
       const ownerProfileId = await ctx.db.insert("ownerProfiles", {
         userId,
         fullName: "Owner",
-        phone: "0500000000",
+        phone: "test-owner-phone",
         verificationStatus: "verified",
         status: "active",
         createdAt: now,
@@ -111,7 +111,7 @@ describe("M19 submission workflow", () => {
     expect(property?.publishedAt).toBeUndefined();
   });
 
-  it("never bypasses property review by phone and publishes a paid roommate card", async () => {
+  it("never bypasses property or roommate moderation based on phone or payment", async () => {
     const t = convexTest(schema, modules);
     const setup = await t.run(async (ctx) => {
       const now = Date.now();
@@ -130,7 +130,7 @@ describe("M19 submission workflow", () => {
       const ownerProfileId = await ctx.db.insert("ownerProfiles", {
         userId,
         fullName: "Direct approval account",
-        phone: "0582968140",
+        phone: "test-owner-phone",
         verificationStatus: "verified",
         status: "active",
         createdAt: now,
@@ -235,10 +235,10 @@ describe("M19 submission workflow", () => {
     });
     expect(state.property?.publishedAt).toBeUndefined();
     expect(state.request).toMatchObject({
-      workflowStatus: "published",
-      publicationStatus: "approved",
-      moderationStatus: "approved",
+      workflowStatus: "pending_admin_review",
+      publicationStatus: "pending_review",
+      moderationStatus: "pending",
     });
-    expect(state.request?.reviewedAt).toBeTypeOf("number");
+    expect(state.request?.reviewedAt).toBeUndefined();
   });
 });
