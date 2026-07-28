@@ -574,7 +574,14 @@ function ConvexAuthServiceBridge({
 
 export function AuthServiceProvider({ children }: { children: ReactNode }) {
   const flags = useMemo(() => getFeatureFlags(), []);
-  const convexClient = useMemo(() => createConvexAuthClient(flags), [flags]);
+  const identityProviderEnabled =
+    flags["auth.google.enabled"] ||
+    flags["auth.emailOtp.enabled"] ||
+    flags["auth.phoneOtp.enabled"];
+  const convexClient = useMemo(
+    () => (identityProviderEnabled ? createConvexAuthClient(flags) : null),
+    [flags, identityProviderEnabled],
+  );
   const dataClient = useMemo(() => createConvexClient(flags), [flags]);
 
   if (convexClient === null) {
