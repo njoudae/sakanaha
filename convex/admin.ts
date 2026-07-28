@@ -1,7 +1,6 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
+import { requireAdmin } from "./lib/authorization";
 import { moderationStatus, platformRole, profileStatus } from "./validators";
 
 const COUNT_LIMIT = 1001;
@@ -43,19 +42,6 @@ const roommateResult = v.object({
   createdAt: v.number(),
   submittedAt: v.optional(v.number()),
 });
-
-async function requireAdmin(ctx: QueryCtx | MutationCtx) {
-  const authUserId = await getAuthUserId(ctx);
-  if (authUserId === null) throw new Error("Authentication required.");
-  const profile = await ctx.db
-    .query("userProfiles")
-    .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
-    .unique();
-  if (profile === null || profile.status !== "active" || profile.primaryRole !== "admin") {
-    throw new Error("Administrator access required.");
-  }
-  return profile;
-}
 
 function boundedCount<T>(rows: T[]) {
   return { value: Math.min(rows.length, COUNT_LIMIT - 1), capped: rows.length === COUNT_LIMIT };
@@ -279,15 +265,32 @@ export const updateUserStatus = mutation({
     if (target._id === admin._id && args.status !== "active") {
       throw new Error("An administrator cannot suspend their own account.");
     }
+    if (target.primaryRole === "admin" && target.status === "active" && args.status !== "active") {
+      const activeAdmins = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_primary_role", (q) => q.eq("primaryRole", "admin"))
+        .take(2);
+      if (activeAdmins.filter((item) => item.status === "active").length <= 1) {
+        throw new Error("The last active administrator cannot be suspended or deleted.");
+      }
+    }
     const now = Date.now();
     await ctx.db.patch(target._id, { status: args.status, updatedAt: now });
     await ctx.db.insert("auditEvents", {
       actorUserId: admin._id,
       actorType: "admin",
       action: "admin.user.status_updated",
+      entity: `userProfiles:${target._id}`,
       targetTable: "userProfiles",
       targetId: target._id,
       metadata: { status: args.status },
+      adminId: admin._id,
+      entityType: "user",
+      entityId: target._id,
+      timestamp: now,
+      reason: "Administrative user status update",
+      previousValue: { status: target.status },
+      newValue: { status: args.status },
       createdAt: now,
     });
     return null;
@@ -335,6 +338,15 @@ export const moderateProperty = mutation({
           : reasonRequired(args.moderation)
             ? "rejected"
             : "pending_review",
+      workflowStatus: approved
+        ? "published"
+        : archived
+          ? "archived"
+          : args.moderation === "needs_review"
+            ? "changes_requested"
+            : args.moderation === "rejected"
+              ? "rejected"
+              : "pending_admin_review",
       rejectionReason: reasonRequired(args.moderation) ? args.reason!.trim() : undefined,
       reviewedAt: now,
       reviewedByUserId: admin._id,
@@ -345,9 +357,23 @@ export const moderateProperty = mutation({
       actorUserId: admin._id,
       actorType: "admin",
       action: "admin.property.moderated",
+      entity: `properties:${property._id}`,
       targetTable: "properties",
       targetId: property._id,
       metadata: { moderationStatus: args.moderation, reason: args.reason },
+      adminId: admin._id,
+      entityType: "property",
+      entityId: property._id,
+      timestamp: now,
+      reason: args.reason?.trim() || `Property ${args.moderation}`,
+      previousValue: {
+        workflowStatus: property.workflowStatus ?? property.publicationStatus,
+        moderationStatus: property.moderationStatus,
+      },
+      newValue: {
+        workflowStatus: approved ? "published" : archived ? "archived" : args.moderation,
+        moderationStatus: args.moderation,
+      },
       createdAt: now,
     });
     return null;
@@ -388,10 +414,21 @@ export const moderateRoommateRequest = mutation({
     });
     await ctx.db.insert("auditEvents", {
       actorUserId: admin._id,
+      adminId: admin._id,
       actorType: "admin",
       action: "admin.roommate_request.moderated",
+      entity: `roommateRequests:${request._id}`,
       targetTable: "roommateRequests",
       targetId: request._id,
+      entityType: "roommate_card",
+      entityId: request._id,
+      timestamp: now,
+      reason: args.reason?.trim() || `Roommate card ${args.moderation}`,
+      previousValue: {
+        workflowStatus: request.workflowStatus ?? request.publicationStatus,
+        moderationStatus: request.moderationStatus,
+      },
+      newValue: { moderationStatus: args.moderation },
       metadata: { moderationStatus: args.moderation, reason: args.reason },
       createdAt: now,
     });
@@ -410,6 +447,7 @@ export const deleteProperty = mutation({
     await ctx.db.patch(property._id, {
       deletedAt: now,
       status: "archived",
+      workflowStatus: "archived",
       publicationStatus: "archived",
       moderationStatus: "archived",
       reviewedAt: now,
@@ -418,10 +456,18 @@ export const deleteProperty = mutation({
     });
     await ctx.db.insert("auditEvents", {
       actorUserId: admin._id,
+      adminId: admin._id,
       actorType: "admin",
       action: "admin.property.deleted",
+      entity: `properties:${property._id}`,
       targetTable: "properties",
       targetId: property._id,
+      entityType: "property",
+      entityId: property._id,
+      timestamp: now,
+      reason: "Administrative soft delete",
+      previousValue: { workflowStatus: property.workflowStatus ?? property.publicationStatus },
+      newValue: { workflowStatus: "archived", deletedAt: now },
       createdAt: now,
     });
     return null;
@@ -438,6 +484,7 @@ export const deleteRoommateRequest = mutation({
     const now = Date.now();
     await ctx.db.patch(request._id, {
       deletedAt: now,
+      workflowStatus: "deleted",
       publicationStatus: "archived",
       moderationStatus: "archived",
       reviewedAt: now,
@@ -446,10 +493,108 @@ export const deleteRoommateRequest = mutation({
     });
     await ctx.db.insert("auditEvents", {
       actorUserId: admin._id,
+      adminId: admin._id,
       actorType: "admin",
       action: "admin.roommate_request.deleted",
+      entity: `roommateRequests:${request._id}`,
       targetTable: "roommateRequests",
       targetId: request._id,
+      entityType: "roommate_card",
+      entityId: request._id,
+      timestamp: now,
+      reason: "Administrative soft delete",
+      previousValue: { workflowStatus: request.workflowStatus ?? request.publicationStatus },
+      newValue: { workflowStatus: "deleted", deletedAt: now },
+      createdAt: now,
+    });
+    return null;
+  },
+});
+
+export const setPropertyOperationalStatus = mutation({
+  args: {
+    propertyId: v.id("properties"),
+    status: v.union(v.literal("suspended"), v.literal("archived"), v.literal("published")),
+    reason: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx);
+    const property = await ctx.db.get("properties", args.propertyId);
+    if (property === null) throw new Error("Property not found.");
+    const reason = args.reason.trim();
+    if (!reason) throw new Error("A reason is required.");
+    if (args.status === "published" && property.workflowStatus !== "suspended") {
+      throw new Error("Only a suspended property can be restored to published.");
+    }
+    const now = Date.now();
+    await ctx.db.patch(property._id, {
+      workflowStatus: args.status,
+      status: args.status === "suspended" ? "paused" : args.status,
+      publicationStatus: args.status === "published" ? "approved" : "archived",
+      deletedAt: undefined,
+      updatedAt: now,
+    });
+    await ctx.db.insert("auditEvents", {
+      actorUserId: admin._id,
+      adminId: admin._id,
+      actorType: "admin",
+      action: `admin.property.${args.status}`,
+      entity: `properties:${property._id}`,
+      targetTable: "properties",
+      targetId: property._id,
+      entityType: "property",
+      entityId: property._id,
+      timestamp: now,
+      reason,
+      previousValue: { workflowStatus: property.workflowStatus ?? property.publicationStatus },
+      newValue: { workflowStatus: args.status },
+      createdAt: now,
+    });
+    return null;
+  },
+});
+
+export const setRoommateCardOperationalStatus = mutation({
+  args: {
+    requestId: v.id("roommateRequests"),
+    status: v.union(
+      v.literal("published"),
+      v.literal("suspended"),
+      v.literal("hidden"),
+      v.literal("deleted"),
+    ),
+    reason: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const admin = await requireAdmin(ctx);
+    const request = await ctx.db.get("roommateRequests", args.requestId);
+    if (request === null) throw new Error("Roommate card not found.");
+    const reason = args.reason.trim();
+    if (!reason) throw new Error("A reason is required.");
+    const now = Date.now();
+    await ctx.db.patch(request._id, {
+      workflowStatus: args.status,
+      status: args.status === "published" ? "open" : "hidden",
+      publicationStatus: args.status === "published" ? "approved" : "archived",
+      deletedAt: args.status === "deleted" ? now : undefined,
+      updatedAt: now,
+    });
+    await ctx.db.insert("auditEvents", {
+      actorUserId: admin._id,
+      adminId: admin._id,
+      actorType: "admin",
+      action: `admin.roommate_card.${args.status}`,
+      entity: `roommateRequests:${request._id}`,
+      targetTable: "roommateRequests",
+      targetId: request._id,
+      entityType: "roommate_card",
+      entityId: request._id,
+      timestamp: now,
+      reason,
+      previousValue: { workflowStatus: request.workflowStatus ?? request.publicationStatus },
+      newValue: { workflowStatus: args.status },
       createdAt: now,
     });
     return null;

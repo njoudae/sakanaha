@@ -463,6 +463,11 @@ export function AuthServiceProvider({ children }: { children: ReactNode }) {
   const convexClient = useMemo(() => createConvexAuthClient(flags), [flags]);
 
   if (convexClient === null) {
+    if (!flags["auth.localLegacy.enabled"]) {
+      throw new Error(
+        "Convex Auth must be configured. Legacy local authentication is disabled in this environment.",
+      );
+    }
     return (
       <AuthServiceContext.Provider value={localStorageAuthService}>
         <LocalAdminDataProvider>

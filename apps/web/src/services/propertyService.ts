@@ -21,7 +21,6 @@ import {
   withNormalizedInventory,
 } from "./propertyAvailability";
 import { getPropertyFeatures } from "./propertyAmenities";
-import { getCurrentOwner, getCurrentUser, isAutomaticApprovalAccount } from "./userService";
 import { previewProperties, previewRoommateRequests } from "../data/previewListings";
 
 const PROPERTY_KEY = "saknaha.properties";
@@ -187,22 +186,7 @@ export function getUserInterests(userId: string): Interest[] {
 
 export function saveProperty(property: Property): Property {
   const properties = getProperties();
-  const currentOwner = getCurrentOwner();
-  const shouldApproveImmediately =
-    property.publicationStatus === "pending_review" &&
-    currentOwner?.id === property.ownerId &&
-    isAutomaticApprovalAccount(currentOwner.phone);
-  const normalizedProperty = withNormalizedInventory(
-    shouldApproveImmediately
-      ? {
-          ...property,
-          status: "published",
-          publicationStatus: "approved",
-          rejectionReason: undefined,
-          reviewedAt: new Date().toISOString(),
-        }
-      : property,
-  );
+  const normalizedProperty = withNormalizedInventory(property);
   const nextProperty = normalizedProperty.id
     ? normalizedProperty
     : { ...normalizedProperty, id: makeId("property"), createdAt: new Date().toISOString() };
@@ -444,16 +428,8 @@ export function getRoommateRequestById(id: string): RoommateRequest | null {
 export function addRoommateRequest(
   input: Omit<RoommateRequest, "id" | "createdAt">,
 ): RoommateRequest {
-  const currentUser = getCurrentUser();
-  const shouldApproveImmediately =
-    input.publicationStatus === "pending_review" &&
-    currentUser?.id === input.userId &&
-    isAutomaticApprovalAccount(currentUser.phone);
   const request: RoommateRequest = {
     ...input,
-    publicationStatus: shouldApproveImmediately ? "approved" : input.publicationStatus,
-    rejectionReason: shouldApproveImmediately ? undefined : input.rejectionReason,
-    reviewedAt: shouldApproveImmediately ? new Date().toISOString() : input.reviewedAt,
     id: makeId("roommate-request"),
     createdAt: new Date().toISOString(),
   };
@@ -579,23 +555,6 @@ export function deleteRoommateCard(requestId: string, userId: string): boolean {
       (view) => view.requestId !== requestId,
     ),
   );
-
-  const properties = getProperties();
-  const property = properties.find((item) => item.id === target.propertyId);
-  const hasOtherRequestForProperty = nextRequests.some(
-    (request) => request.propertyId === target.propertyId,
-  );
-  if (
-    property &&
-    property.ownerId === userId &&
-    property.propertyLicenseNumber === "external-roommate-card" &&
-    !hasOtherRequestForProperty
-  ) {
-    writeStorage(
-      PROPERTY_KEY,
-      properties.filter((item) => item.id !== property.id),
-    );
-  }
 
   return true;
 }

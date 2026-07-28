@@ -10,7 +10,7 @@ import {
 import { getAllOwners, getAllUsers } from "../services/userService";
 
 export type PlatformRole =
-  "admin" | "support" | "moderator" | "owner" | "user" | "service_provider";
+  "admin" | "support" | "moderator" | "real_estate_agent" | "owner" | "user" | "service_provider";
 export type ProfileStatus = "active" | "pending_claim" | "suspended" | "deleted";
 export type ModerationStatus = "pending" | "approved" | "rejected" | "needs_review" | "archived";
 

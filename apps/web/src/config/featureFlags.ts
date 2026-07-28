@@ -1,5 +1,6 @@
 export type FeatureFlagKey =
   | "auth.convexAuth.enabled"
+  | "auth.localLegacy.enabled"
   | "auth.google.enabled"
   | "auth.emailOtp.enabled"
   | "auth.phoneOtp.enabled"
@@ -14,6 +15,7 @@ export type FeatureFlagMap = Readonly<Record<FeatureFlagKey, boolean>>;
 
 export const defaultFeatureFlags: FeatureFlagMap = {
   "auth.convexAuth.enabled": false,
+  "auth.localLegacy.enabled": import.meta.env.DEV,
   "auth.google.enabled": false,
   "auth.emailOtp.enabled": false,
   "auth.phoneOtp.enabled": false,
@@ -37,6 +39,9 @@ export function getFeatureFlags(): FeatureFlagMap {
     "auth.convexAuth.enabled":
       envFlag("VITE_FEATURE_AUTH_CONVEX_AUTH_ENABLED") ??
       defaultFeatureFlags["auth.convexAuth.enabled"],
+    "auth.localLegacy.enabled":
+      envFlag("VITE_FEATURE_AUTH_LOCAL_LEGACY_ENABLED") ??
+      defaultFeatureFlags["auth.localLegacy.enabled"],
     "auth.google.enabled":
       envFlag("VITE_FEATURE_AUTH_GOOGLE_ENABLED") ?? defaultFeatureFlags["auth.google.enabled"],
     "auth.emailOtp.enabled":

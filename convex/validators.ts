@@ -4,10 +4,45 @@ export const platformRole = v.union(
   v.literal("admin"),
   v.literal("support"),
   v.literal("moderator"),
+  v.literal("real_estate_agent"),
+  // Deprecated compatibility roles. Migrate these before narrowing the schema.
   v.literal("owner"),
   v.literal("user"),
   v.literal("service_provider"),
 );
+
+export const propertyWorkflowStatus = v.union(
+  v.literal("draft"),
+  v.literal("pending_payment"),
+  v.literal("paid"),
+  v.literal("pending_admin_review"),
+  v.literal("changes_requested"),
+  v.literal("rejected"),
+  v.literal("approved"),
+  v.literal("published"),
+  v.literal("archived"),
+  v.literal("suspended"),
+);
+
+export const roommateCardWorkflowStatus = v.union(
+  v.literal("draft"),
+  v.literal("pending_payment"),
+  v.literal("paid"),
+  v.literal("published"),
+  v.literal("suspended"),
+  v.literal("hidden"),
+  v.literal("deleted"),
+);
+
+export const paymentStatus = v.union(
+  v.literal("pending"),
+  v.literal("paid"),
+  v.literal("failed"),
+  v.literal("refunded"),
+  v.literal("cancelled"),
+);
+
+export const paymentEntityType = v.union(v.literal("property"), v.literal("roommate_card"));
 
 export const profileStatus = v.union(
   v.literal("active"),

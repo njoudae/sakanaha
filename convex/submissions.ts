@@ -68,12 +68,13 @@ export const submitPropertyForReview = mutation({
     ) {
       throw new Error("At least one uploaded property image is required.");
     }
-    if (process.env.PUBLISHING_FEE_ENABLED === "true" && property.paymentCompleted !== true) {
+    if (property.paymentStatus !== "paid" && property.paymentCompleted !== true) {
       throw new Error("Publishing payment is required.");
     }
     const now = Date.now();
     await ctx.db.patch(property._id, {
       status: "pending_review",
+      workflowStatus: "pending_admin_review",
       publicationStatus: "pending_review",
       moderationStatus: "pending",
       rejectionReason: undefined,
@@ -89,6 +90,9 @@ export const submitPropertyForReview = mutation({
       action: "property.submitted_for_review",
       targetTable: "properties",
       targetId: property._id,
+      previousValue: { workflowStatus: property.workflowStatus ?? property.publicationStatus },
+      newValue: { workflowStatus: "pending_admin_review" },
+      timestamp: now,
       createdAt: now,
     });
     return null;
@@ -107,29 +111,45 @@ export const submitRoommateRequestForReview = mutation({
     if (request.userId !== profile._id) {
       throw new Error("Only the card owner can submit it.");
     }
-    required(request.region, "Region");
-    required(request.city, "City");
-    required(request.district, "District");
+    const city = request.externalHousing?.city ?? request.city;
+    const district = request.externalHousing?.district ?? request.district;
+    required(
+      request.region ?? request.externalHousing?.approximateLocation ?? "external",
+      "Region",
+    );
+    required(city, "City");
+    required(district, "District");
     required(request.organization, "University");
-    if (!validCoordinates(request.approximateLat, request.approximateLng)) {
+    const lat = request.externalHousing?.approximateLat ?? request.approximateLat;
+    const lng = request.externalHousing?.approximateLng ?? request.approximateLng;
+    if (!validCoordinates(lat, lng)) {
       throw new Error("An approximate location is required.");
     }
     const now = Date.now();
     await ctx.db.patch(request._id, {
-      publicationStatus: "pending_review",
-      moderationStatus: "pending",
+      workflowStatus: request.paymentStatus === "paid" ? "published" : "pending_payment",
+      publicationStatus: request.paymentStatus === "paid" ? "approved" : "draft",
+      moderationStatus: request.paymentStatus === "paid" ? "approved" : "pending",
       rejectionReason: undefined,
       submittedAt: now,
-      reviewedAt: undefined,
+      reviewedAt: request.paymentStatus === "paid" ? now : undefined,
       reviewedByUserId: undefined,
       updatedAt: now,
     });
     await ctx.db.insert("auditEvents", {
       actorUserId: profile._id,
       actorType: "user",
-      action: "roommate_request.submitted_for_review",
+      action:
+        request.paymentStatus === "paid"
+          ? "roommate_request.published_after_verified_payment"
+          : "roommate_request.payment_requested",
       targetTable: "roommateRequests",
       targetId: request._id,
+      previousValue: { workflowStatus: request.workflowStatus ?? request.publicationStatus },
+      newValue: {
+        workflowStatus: request.paymentStatus === "paid" ? "published" : "pending_payment",
+      },
+      timestamp: now,
       createdAt: now,
     });
     return null;

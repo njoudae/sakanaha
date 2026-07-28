@@ -14,7 +14,7 @@ import RoommatePreferencesFields from "../components/RoommatePreferencesFields";
 import UniversityReferenceSelector from "../components/UniversityReferenceSelector";
 import { useAuthService } from "../auth";
 import { useMapsData } from "../data/MapsDataContext";
-import { addRoommateRequest, getUserActivity, saveProperty } from "../services/propertyService";
+import { addRoommateRequest, getUserActivity } from "../services/propertyService";
 import { defaultRoommatePreferences } from "../services/roommatePreferenceDefaults";
 
 interface RoommateCreatePageProps {
@@ -25,6 +25,10 @@ interface RoommateCreatePageProps {
 }
 
 type LocationMethod = "current" | "link" | "map";
+
+function externalHousingFormSnapshot(property: Property): Property {
+  return property;
+}
 
 export default function RoommateCreatePage({
   user,
@@ -116,7 +120,7 @@ export default function RoommateCreatePage({
     const externalPricePerPerson = Math.max(0, Number(pricePerPerson) || 0);
     const linkedProperty =
       selectedProperty ??
-      saveProperty({
+      externalHousingFormSnapshot({
         id: "",
         ownerId: user.id,
         ownerName: user.name,
@@ -184,6 +188,18 @@ export default function RoommateCreatePage({
       bio: bio.trim(),
       availableRooms: rooms,
       source,
+      linkedPropertyId: source === "saknaha_property" ? linkedProperty.id : undefined,
+      externalHousing:
+        source === "external_property"
+          ? {
+              city,
+              district: neighborhood.trim(),
+              approximateLocation: googleMapsUrl || undefined,
+              nearbyLandmarks: landmark.trim() ? [landmark.trim()] : undefined,
+              approximateLat: lat,
+              approximateLng: lng,
+            }
+          : undefined,
       pricePerPerson: source === "saknaha_property" ? listedPrice : externalPricePerPerson,
       preferences,
       region: linkedProperty.region,

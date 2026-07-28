@@ -27,10 +27,18 @@ const roleLabels: Record<PlatformRole, string> = {
   admin: "مدير",
   support: "دعم",
   moderator: "مشرف",
+  real_estate_agent: "وسيط عقاري",
   owner: "مالك",
   user: "مستخدم",
   service_provider: "مزود خدمة",
 };
+const visibleRoleOptions: PlatformRole[] = [
+  "admin",
+  "real_estate_agent",
+  "user",
+  "owner",
+  "service_provider",
+];
 
 const statusLabels: Record<ProfileStatus, string> = {
   active: "نشط",
@@ -225,9 +233,9 @@ export default function AdminDashboardPage() {
                   aria-label="تصفية حسب الدور"
                 >
                   <option value="">كل الأدوار</option>
-                  {Object.entries(roleLabels).map(([value, label]) => (
+                  {visibleRoleOptions.map((value) => (
                     <option key={value} value={value}>
-                      {label}
+                      {roleLabels[value]}
                     </option>
                   ))}
                 </select>

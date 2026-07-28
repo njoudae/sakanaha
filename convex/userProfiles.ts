@@ -1,12 +1,29 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
+import { v } from "convex/values";
 
 function displayNameFromAuthUser(user: { name?: string; email?: string; phone?: string }): string {
   return user.name ?? user.email ?? user.phone ?? "Saknaha user";
 }
 
+async function nextPublicCode(ctx: MutationCtx): Promise<string> {
+  const counter = await ctx.db
+    .query("publicIdCounters")
+    .withIndex("by_key", (q) => q.eq("key", "user"))
+    .unique();
+  const next = (counter?.value ?? 0) + 1;
+  if (counter) {
+    await ctx.db.patch(counter._id, { value: next, updatedAt: Date.now() });
+  } else {
+    await ctx.db.insert("publicIdCounters", { key: "user", value: next, updatedAt: Date.now() });
+  }
+  return `SK-${String(next).padStart(6, "0")}`;
+}
+
 export const current = query({
   args: {},
+  returns: v.union(v.null(), v.any()),
   handler: async (ctx) => {
     const authUserId = await getAuthUserId(ctx);
     if (authUserId === null) return null;
@@ -20,6 +37,7 @@ export const current = query({
 
 export const ensureCurrent = mutation({
   args: {},
+  returns: v.id("userProfiles"),
   handler: async (ctx) => {
     const authUserId = await getAuthUserId(ctx);
     if (authUserId === null) {
@@ -30,7 +48,15 @@ export const ensureCurrent = mutation({
       .query("userProfiles")
       .withIndex("by_auth_user", (q) => q.eq("authUserId", authUserId))
       .first();
-    if (existing !== null) return existing._id;
+    if (existing !== null) {
+      if (!existing.publicCode) {
+        await ctx.db.patch(existing._id, {
+          publicCode: await nextPublicCode(ctx),
+          updatedAt: Date.now(),
+        });
+      }
+      return existing._id;
+    }
 
     const authUser = await ctx.db.get(authUserId);
     if (authUser === null) {
@@ -47,6 +73,7 @@ export const ensureCurrent = mutation({
         await ctx.db.patch(profileByEmail._id, {
           authUserId,
           authSubject: `convex:${authUserId}`,
+          publicCode: profileByEmail.publicCode ?? (await nextPublicCode(ctx)),
           updatedAt: now,
         });
         return profileByEmail._id;
@@ -62,6 +89,7 @@ export const ensureCurrent = mutation({
         await ctx.db.patch(profileByPhone._id, {
           authUserId,
           authSubject: `convex:${authUserId}`,
+          publicCode: profileByPhone.publicCode ?? (await nextPublicCode(ctx)),
           updatedAt: now,
         });
         return profileByPhone._id;
@@ -71,6 +99,7 @@ export const ensureCurrent = mutation({
     return await ctx.db.insert("userProfiles", {
       authUserId,
       authSubject: `convex:${authUserId}`,
+      publicCode: await nextPublicCode(ctx),
       name: displayNameFromAuthUser(authUser),
       email: authUser.email,
       phone: authUser.phone,
