@@ -16,6 +16,10 @@ import {
   type BusinessActivity,
   type BusinessDataValue,
 } from "./BusinessDataContext";
+import {
+  localDevelopmentProperties,
+  localDevelopmentRoommateRequests,
+} from "./localDevelopmentExamples";
 
 type PropertyRow = Doc<"properties"> & {
   ownerName?: string;
@@ -234,7 +238,22 @@ export function ConvexBusinessProvider({
 
   const value = useMemo<BusinessDataValue>(() => {
     if (snapshot === undefined) return { ...emptyBusinessData, loading: true };
-    const properties = snapshot.properties.map(propertyFromRow);
+    const convexProperties = snapshot.properties.map(propertyFromRow);
+    const propertyIds = new Set(convexProperties.map((property) => property.id));
+    const properties = [
+      ...convexProperties,
+      ...(import.meta.env.DEV ? localDevelopmentProperties : []).filter(
+        (property) => !propertyIds.has(property.id),
+      ),
+    ];
+    const convexRoommateRequests = snapshot.roommateRequests.map(roommateFromRow);
+    const roommateRequestIds = new Set(convexRoommateRequests.map((request) => request.id));
+    const roommateRequests = [
+      ...convexRoommateRequests,
+      ...(import.meta.env.DEV ? localDevelopmentRoommateRequests : []).filter(
+        (request) => !roommateRequestIds.has(request.id),
+      ),
+    ];
     const allProperties = new Map(
       [...snapshot.properties, ...snapshot.ownerProperties, ...snapshot.favorites].map((row) => [
         row._id,
@@ -271,7 +290,7 @@ export function ConvexBusinessProvider({
       loading: false,
       properties,
       ownerProperties: snapshot.ownerProperties.map(propertyFromRow),
-      roommateRequests: snapshot.roommateRequests.map(roommateFromRow),
+      roommateRequests,
       favoritePropertyIds: snapshot.favoritePropertyIds,
       activity,
       saveProperty: async (property) => {
