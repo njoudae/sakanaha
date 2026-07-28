@@ -1,11 +1,13 @@
-import logo from "../assets/saknaha-logo.png";
+import logo from "../assets/saknaha-logo.webp";
 import type { ReactNode } from "react";
 
 interface FooterProps {
   onHome: () => void;
   onOwner: () => void;
-  onUser: () => void;
+  onHousing: () => void;
   onCities: () => void;
+  onRoommates: () => void;
+  onAbout: () => void;
   onFaq: () => void;
   onSupport: () => void;
 }
@@ -13,8 +15,10 @@ interface FooterProps {
 export default function Footer({
   onHome,
   onOwner,
-  onUser,
+  onHousing,
   onCities,
+  onRoommates,
+  onAbout,
   onFaq,
   onSupport,
 }: FooterProps) {
@@ -22,7 +26,15 @@ export default function Footer({
     <footer className="border-t border-stone-200/70 bg-white/75">
       <div className="mx-auto grid w-full max-w-7xl gap-7 px-4 py-8 md:grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr] md:px-8">
         <div>
-          <img src={logo} alt="سكنها" className="h-14 w-32 object-contain object-right" />
+          <img
+            src={logo}
+            alt="سكنها"
+            width="320"
+            height="264"
+            loading="lazy"
+            decoding="async"
+            className="h-14 w-32 object-contain object-right"
+          />
           <p className="mt-3 max-w-md text-sm font-bold leading-7 text-stone-600">
             سكنها منصة تساعد الباحثات عن السكن وأصحاب الوحدات على الوصول لبعضهم بطريقة أوضح وأسهل.
           </p>
@@ -31,21 +43,21 @@ export default function Footer({
           </span>
         </div>
 
-        <FooterGroup title="البحث عن سكن">
+        <FooterGroup title="التنقل">
           <FooterButton onClick={onHome}>الرئيسية</FooterButton>
-          <FooterButton onClick={onCities}>تصفح المدن</FooterButton>
-          <FooterButton onClick={onUser}>أبحث عن سكن</FooterButton>
+          <FooterButton onClick={onCities}>البحث عن سكن</FooterButton>
+          <FooterButton onClick={onRoommates}>البحث عن شريكة سكن</FooterButton>
         </FooterGroup>
 
-        <FooterGroup title="لأصحاب السكن">
-          <FooterButton onClick={onOwner}>عرض وحدة سكنية</FooterButton>
-          <FooterButton onClick={onOwner}>إدارة السكن</FooterButton>
-          <FooterButton onClick={onSupport}>خدمة التصوير</FooterButton>
+        <FooterGroup title="المستفيدون">
+          <FooterButton onClick={onOwner}>مالك عقار</FooterButton>
+          <FooterButton onClick={onHousing}>باحثة عن سكن</FooterButton>
+          <FooterButton onClick={onRoommates}>شريكة سكن</FooterButton>
         </FooterGroup>
 
         <FooterGroup title="الدعم">
+          <FooterButton onClick={onAbout}>عن سكنها</FooterButton>
           <FooterButton onClick={onSupport}>تواصل معنا</FooterButton>
-          <FooterButton onClick={onSupport}>الإبلاغ عن مشكلة</FooterButton>
           <FooterButton onClick={onFaq}>الأسئلة الشائعة</FooterButton>
         </FooterGroup>
       </div>

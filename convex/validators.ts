@@ -48,10 +48,13 @@ export const roleAssignmentStatus = v.union(v.literal("active"), v.literal("disa
 
 export const listingStatus = v.union(
   v.literal("draft"),
+  v.literal("pending_review"),
   v.literal("published"),
+  v.literal("approved"),
   v.literal("paused"),
   v.literal("archived"),
   v.literal("rejected"),
+  v.literal("unpublished"),
 );
 
 export const moderationStatus = v.union(
@@ -59,6 +62,16 @@ export const moderationStatus = v.union(
   v.literal("approved"),
   v.literal("rejected"),
   v.literal("needs_review"),
+  v.literal("archived"),
+);
+
+export const publicationStatus = v.union(
+  v.literal("draft"),
+  v.literal("pending_review"),
+  v.literal("approved"),
+  v.literal("rejected"),
+  v.literal("archived"),
+  v.literal("unpublished"),
 );
 
 export const locationQuality = v.union(

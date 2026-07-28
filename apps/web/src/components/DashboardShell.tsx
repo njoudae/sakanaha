@@ -2,10 +2,11 @@ import {
   BarChart3,
   Bell,
   Building2,
+  CreditCard,
   Heart,
   Home,
   Inbox,
-  MessageCircle,
+  LogOut,
   Plus,
   Search,
   Settings,
@@ -23,33 +24,39 @@ interface DashboardShellProps {
   kind: ShellKind;
   name: string;
   status: string;
+  publicCode?: string;
+  navigation?: DashboardNavItem[];
+  onNavigate?: (label: string) => void;
   children: ReactNode;
+}
+
+export interface DashboardNavItem {
+  label: string;
+  icon: LucideIcon;
+  onClick?: () => void;
 }
 
 const navByKind = {
   user: [
-    { label: "الرئيسية", icon: Home },
-    { label: "السكن", icon: Search },
-    { label: "شريكات السكن", icon: UsersRound },
-    { label: "المفضلة", icon: Heart },
-    { label: "طلباتي", icon: Inbox },
-    { label: "الرسائل", icon: MessageCircle },
-    { label: "الإشعارات", icon: Bell },
-    { label: "الملف الشخصي", icon: UserRound },
+    { label: "لوحة التحكم", icon: Home },
+    { label: "البحث عن سكن", icon: Search },
+    { label: "البحث عن شريكة سكن", icon: UsersRound },
+    { label: "إنشاء بطاقة شريكة سكن", icon: Plus },
+    { label: "بطاقاتي", icon: UserRound },
+    { label: "اهتمامات شريكات السكن", icon: Inbox },
+    { label: "الاهتمامات", icon: Heart },
+    { label: "التفضيلات", icon: SlidersHorizontal },
     { label: "الإعدادات", icon: Settings },
+    { label: "تسجيل الخروج", icon: LogOut },
   ],
   owner: [
     { label: "لوحة التحكم", icon: Home },
     { label: "عقاراتي", icon: Building2 },
     { label: "إضافة عقار", icon: Plus },
-    { label: "الاهتمامات الواردة", icon: Inbox },
-    { label: "طلبات شريكة السكن", icon: UsersRound },
-    { label: "المفاوضات", icon: SlidersHorizontal },
-    { label: "الرسائل", icon: MessageCircle },
-    { label: "الإشعارات", icon: Bell },
-    { label: "التحليلات", icon: BarChart3 },
-    { label: "الملف الشخصي", icon: UserRound },
+    { label: "طلبات العقارات", icon: Inbox },
+    { label: "المدفوعات", icon: CreditCard },
     { label: "الإعدادات", icon: Settings },
+    { label: "تسجيل الخروج", icon: LogOut },
   ],
   admin: [
     { label: "نظرة عامة", icon: Home },
@@ -65,14 +72,28 @@ const navByKind = {
   ],
 } satisfies Record<ShellKind, { label: string; icon: LucideIcon }[]>;
 
-export default function DashboardShell({ kind, name, status, children }: DashboardShellProps) {
-  const nav = navByKind[kind];
+export default function DashboardShell({
+  kind,
+  name,
+  status,
+  publicCode,
+  navigation,
+  onNavigate,
+  children,
+}: DashboardShellProps) {
+  const nav: DashboardNavItem[] = navigation ?? navByKind[kind];
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-4 px-4 py-5 pb-24 md:px-8 lg:grid-cols-[300px_minmax(0,1fr)] lg:pb-8">
       <aside className="hidden lg:block">
         <div className="sticky top-24 grid gap-4">
-          <ProfilePanel name={name} status={status} nav={nav} />
+          <ProfilePanel
+            name={name}
+            status={status}
+            publicCode={publicCode}
+            nav={nav}
+            onNavigate={onNavigate}
+          />
           <NotificationCenter />
         </div>
       </aside>
@@ -86,6 +107,7 @@ export default function DashboardShell({ kind, name, status, children }: Dashboa
               key={item.label}
               className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-black text-stone-600 transition hover:bg-linen hover:text-berry"
               type="button"
+              onClick={item.onClick ?? (() => onNavigate?.(item.label))}
             >
               <item.icon size={18} aria-hidden="true" />
               <span className="max-w-full truncate">{item.label}</span>
@@ -100,11 +122,15 @@ export default function DashboardShell({ kind, name, status, children }: Dashboa
 function ProfilePanel({
   name,
   status,
+  publicCode,
+  onNavigate,
   nav,
 }: {
   name: string;
   status: string;
-  nav: { label: string; icon: LucideIcon }[];
+  publicCode?: string;
+  nav: DashboardNavItem[];
+  onNavigate?: (label: string) => void;
 }) {
   return (
     <section className="panel">
@@ -115,6 +141,11 @@ function ProfilePanel({
         <div className="min-w-0">
           <h2 className="truncate text-lg font-black text-ink">{name}</h2>
           <p className="text-sm font-bold text-stone-600">{status}</p>
+          {publicCode ? (
+            <p className="mt-1 text-xs font-black tracking-wide text-berry" dir="ltr">
+              {publicCode}
+            </p>
+          ) : null}
         </div>
       </div>
       <div className="grid gap-1">
@@ -123,6 +154,7 @@ function ProfilePanel({
             key={item.label}
             className="flex items-center gap-3 rounded-xl px-3 py-2 text-right text-sm font-black text-stone-600 transition hover:bg-linen hover:text-berry"
             type="button"
+            onClick={item.onClick ?? (() => onNavigate?.(item.label))}
           >
             <item.icon size={17} aria-hidden="true" />
             {item.label}

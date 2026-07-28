@@ -9,6 +9,7 @@ interface DiscoveryCarouselProps<T> {
   renderItem: (item: T) => ReactNode;
   emptyText?: string;
   itemClassName?: string;
+  railClassName?: string;
 }
 
 export default function DiscoveryCarousel<T>({
@@ -18,7 +19,8 @@ export default function DiscoveryCarousel<T>({
   onTitleClick,
   renderItem,
   emptyText = "لا توجد عناصر للعرض حالياً.",
-  itemClassName = "w-[78vw] max-w-none shrink-0 snap-start sm:w-[280px] lg:w-[300px]",
+  itemClassName = "h-[420px] w-[78vw] max-w-none shrink-0 snap-start sm:w-[280px] lg:w-[300px]",
+  railClassName = "",
 }: DiscoveryCarouselProps<T>) {
   const railRef = useRef<HTMLDivElement | null>(null);
 
@@ -33,19 +35,19 @@ export default function DiscoveryCarousel<T>({
   }
 
   return (
-    <section className="w-full py-5" dir="rtl">
-      <div className="mb-3 flex items-end justify-between gap-3 px-4 md:px-8">
+    <section className="w-full py-3 md:py-4" dir="rtl">
+      <div className="mb-2.5 flex items-end justify-between gap-3 px-4 md:px-8">
         <div className="text-right" dir="rtl">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center">
             <button
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-berry shadow-sm transition hover:border-berry hover:bg-linen"
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg px-1 text-berry transition hover:bg-linen"
               onClick={onTitleClick}
               aria-label={`عرض كل ${title}`}
               type="button"
             >
-              <ArrowLeft size={18} aria-hidden="true" />
+              <h2 className="text-xl font-black text-ink md:text-3xl">{title}</h2>
+              <ArrowLeft size={18} aria-hidden="true" className="shrink-0" />
             </button>
-            <h2 className="text-2xl font-black text-ink md:text-3xl">{title}</h2>
           </div>
           {subtitle ? (
             <span className="mt-1 block text-sm font-bold text-stone-600">{subtitle}</span>
@@ -79,7 +81,7 @@ export default function DiscoveryCarousel<T>({
       ) : (
         <div
           ref={railRef}
-          className="flex snap-x gap-4 overflow-x-auto px-4 pb-3 [scrollbar-width:none] md:px-8 [&::-webkit-scrollbar]:hidden"
+          className={`flex snap-x gap-3 overflow-x-auto px-4 pb-3 [scrollbar-width:none] md:gap-4 md:px-8 [&::-webkit-scrollbar]:hidden ${railClassName}`}
           aria-label={title}
           dir="rtl"
         >

@@ -1,14 +1,32 @@
-import { BedDouble, GraduationCap, Heart, MapPin, Share2, Store } from "lucide-react";
+import {
+  Bath,
+  BedDouble,
+  Building2,
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  Heart,
+  Landmark,
+  MapPin,
+  Share2,
+  Sparkles,
+  Store,
+  Wifi,
+} from "lucide-react";
 import type { Property } from "@saknaha/shared-types";
 import { formatRooms } from "@saknaha/utils/propertyFormat";
-
-type DisplayPropertyType = "عمارة" | "شقة" | "فندق" | "دور";
-type AvailabilityState = "available" | "nearlyFull" | "full";
+import { useState } from "react";
+import {
+  getPropertyCardPresentation,
+  type PropertyCardAvailability,
+} from "../services/listingPresentation";
+import { getAvailableUnits } from "../services/propertyAvailability";
 
 interface PropertyCardProps {
   property: Property;
   onView: (property: Property) => void;
   compact?: boolean;
+  featured?: boolean;
   actionLabel?: string;
   isFavorite?: boolean;
   onFavorite?: (property: Property) => void;
@@ -16,134 +34,108 @@ interface PropertyCardProps {
   mapColor?: string;
 }
 
-const specialCardPresentation: Partial<
-  Record<
-    string,
-    {
-      type: DisplayPropertyType;
-      title: string;
-      availability: AvailabilityState;
-    }
-  >
-> = {
-  "mock-riyadh-yasmin": {
-    type: "فندق",
-    title: "فندق بالقرب من جامعة الملك خالد",
-    availability: "available",
-  },
-  "mock-jeddah-salama": {
-    type: "دور",
-    title: "دور نسائي",
-    availability: "nearlyFull",
-  },
-  "mock-dammam-faisaliyah": {
-    type: "شقة",
-    title: "شقة في عمارة عوائل",
-    availability: "full",
-  },
+const availabilityStyles: Record<PropertyCardAvailability, string> = {
+  available: "bg-emerald-500 text-white",
+  nearlyFull: "bg-amber-500 text-white",
+  full: "bg-stone-700 text-white",
 };
 
-const availabilityStyles: Record<AvailabilityState, string> = {
-  available: "bg-emerald-100 text-ink",
-  nearlyFull: "bg-rose-100 text-ink",
-  full: "bg-stone-300 text-ink",
-};
-
-const availabilityLabels: Record<AvailabilityState, string> = {
+const availabilityLabels: Record<PropertyCardAvailability, string> = {
   available: "متاح",
-  nearlyFull: "شبه ممتلئ",
+  nearlyFull: "متبقي القليل",
   full: "ممتلئ",
 };
 
-function classificationLabel(property: Property) {
-  if (property.id.startsWith("mock-")) return "عمارة نسائية بالكامل";
-  if (property.classification === "نسائي بالكامل") return "عمارة نسائية بالكامل";
-  if (property.classification === "دور نسائي داخل سكن عوائل") return "دور نسائي في عمارة عوائل";
-  if (property.classification === "متاح للجميع") return "فندق";
-  if (property.classification === "عوائل") return "شقة في عمارة عوائل";
-  return property.classification;
+function hasInternet(property: Property) {
+  return (
+    property.rentIncludes?.includes("internet") ||
+    property.services.some((service) => service.name.includes("إنترنت"))
+  );
 }
 
-function typeLabel(property: Property): DisplayPropertyType {
-  if (property.propertyType === "عمارة") return "عمارة";
-  if (property.propertyType === "دور") return "دور";
-  if (property.propertyType === "شقة") return "شقة";
-  return "فندق";
-}
-
-function getPresentation(property: Property) {
-  const special = specialCardPresentation[property.id];
-  if (special) return special;
-
-  if (!property.id.startsWith("mock-")) {
-    return {
-      type: typeLabel(property),
-      title: classificationLabel(property),
-      availability: property.status === "published" ? ("available" as const) : ("full" as const),
-    };
-  }
-
-  return {
-    type: "عمارة" as const,
-    title: "عمارة نسائية بالكامل",
-    availability: property.status === "published" ? ("available" as const) : ("full" as const),
-  };
-}
-
-function hasNearbyUniversity(property: Property) {
-  const value = property.universityNearby.trim();
-  return value.length > 0 && value !== "غير محدد";
+function hasSecurityCameras(property: Property) {
+  return property.features?.includes("security_cameras") ?? false;
 }
 
 export default function PropertyCard({
   property,
   onView,
   compact,
+  featured = false,
   actionLabel = "عرض التفاصيل",
   isFavorite,
   onFavorite,
   onShare,
   mapColor,
 }: PropertyCardProps) {
-  const presentation = getPresentation(property);
-  const isHotel = presentation.type === "فندق";
-  const price = (isHotel ? 100 : property.price).toLocaleString("ar-SA");
-  const pricePeriod = isHotel ? "يوم" : "شهر";
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [localFavorite, setLocalFavorite] = useState(false);
+  const presentation = getPropertyCardPresentation(property);
+  const imageCount = property.images.length;
+  const safeImageIndex = Math.min(activeImageIndex, Math.max(0, imageCount - 1));
+  const favorite = isFavorite ?? localFavorite;
+  const availableUnits = getAvailableUnits(property);
+
+  function toggleFavorite() {
+    if (onFavorite) onFavorite(property);
+    else setLocalFavorite((current) => !current);
+  }
 
   return (
-    <article className="group min-w-0 rounded-2xl bg-transparent text-right" dir="rtl">
-      <div className="relative overflow-hidden rounded-2xl bg-stone-100 shadow-sm">
+    <article
+      className="group flex h-full min-w-0 flex-col overflow-hidden rounded-none border border-stone-200 bg-white text-right shadow-[0_10px_30px_rgba(45,28,42,0.07)] transition hover:-translate-y-0.5 hover:border-berry/30 hover:shadow-[0_16px_40px_rgba(75,38,68,0.12)]"
+      dir="rtl"
+    >
+      <div className="relative overflow-hidden bg-stone-100">
         <button
           className="block w-full"
           onClick={() => onView(property)}
           type="button"
           aria-label={`${actionLabel}: ${presentation.title}`}
         >
-          <img
-            src={property.images[0]}
-            alt={presentation.title}
-            className={`w-full object-cover transition duration-300 group-hover:scale-[1.03] ${
-              compact ? "h-48" : "h-60"
-            }`}
-          />
+          {property.images[safeImageIndex] ? (
+            <img
+              src={property.images[safeImageIndex]}
+              alt={presentation.title}
+              className={`w-full object-cover transition duration-500 group-hover:scale-[1.035] ${
+                featured ? "h-48 sm:h-52" : compact ? "h-52" : "h-64"
+              }`}
+            />
+          ) : (
+            <span
+              className={`flex w-full items-center justify-center bg-linen px-5 text-sm font-extrabold text-stone-500 ${
+                featured ? "h-48 sm:h-52" : compact ? "h-52" : "h-64"
+              }`}
+            >
+              لا توجد صورة متاحة
+            </span>
+          )}
         </button>
 
+        <span
+          className={`absolute right-3 top-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold shadow-sm ${availabilityStyles[presentation.availability]}`}
+        >
+          <Sparkles size={13} aria-hidden="true" />
+          {availabilityLabels[presentation.availability]}
+          {presentation.availability !== "full"
+            ? ` · ${availableUnits.toLocaleString("ar-SA")} وحدات`
+            : ""}
+        </span>
+
         <div className="absolute left-3 top-3 flex gap-2">
-          {onFavorite ? (
-            <button
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition ${
-                isFavorite ? "text-berry" : "text-ink hover:text-berry"
-              }`}
-              onClick={() => onFavorite(property)}
-              aria-label={isFavorite ? "إزالة من المفضلة" : "إضافة إلى المفضلة"}
-              type="button"
-            >
-              <Heart size={19} fill={isFavorite ? "currentColor" : "none"} aria-hidden="true" />
-            </button>
-          ) : null}
+          <button
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 shadow-md backdrop-blur transition ${
+              favorite ? "text-berry" : "text-ink hover:text-berry"
+            }`}
+            onClick={toggleFavorite}
+            aria-label={favorite ? "إزالة من المفضلة" : "إضافة إلى المفضلة"}
+            type="button"
+          >
+            <Heart size={19} fill={favorite ? "currentColor" : "none"} aria-hidden="true" />
+          </button>
           {onShare ? (
             <button
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink shadow-sm backdrop-blur transition hover:text-berry"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-ink shadow-md backdrop-blur transition hover:text-berry"
               onClick={() => onShare(property)}
               aria-label="مشاركة السكن"
               type="button"
@@ -153,8 +145,41 @@ export default function PropertyCard({
           ) : null}
         </div>
 
+        {imageCount > 1 ? (
+          <>
+            <button
+              className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-ink shadow-md backdrop-blur transition hover:bg-white"
+              type="button"
+              aria-label="الصورة السابقة"
+              onClick={() =>
+                setActiveImageIndex((current) => (current - 1 + imageCount) % imageCount)
+              }
+            >
+              <ChevronRight size={19} aria-hidden="true" />
+            </button>
+            <button
+              className="absolute left-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-ink shadow-md backdrop-blur transition hover:bg-white"
+              type="button"
+              aria-label="الصورة التالية"
+              onClick={() => setActiveImageIndex((current) => (current + 1) % imageCount)}
+            >
+              <ChevronLeft size={19} aria-hidden="true" />
+            </button>
+            <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+              {property.images.map((_, index) => (
+                <span
+                  key={index}
+                  className={`h-1.5 rounded-full shadow-sm transition-all ${
+                    index === safeImageIndex ? "w-5 bg-white" : "w-1.5 bg-white/60"
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        ) : null}
+
         {mapColor ? (
-          <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-stone-700 shadow-sm backdrop-blur">
+          <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 bg-white/95 px-3 py-1 text-xs font-extrabold text-stone-700 shadow-sm backdrop-blur">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: mapColor }} />
             نقطة الخريطة
           </span>
@@ -162,49 +187,83 @@ export default function PropertyCard({
       </div>
 
       <button
-        className="mt-3 block w-full text-right"
+        className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3 text-right"
         onClick={() => onView(property)}
         type="button"
       >
-        <div className="flex items-center justify-between gap-3 text-sm font-bold">
-          <span
-            className={`inline-flex min-w-0 items-center rounded-full px-3 py-1 text-xs font-black ${availabilityStyles[presentation.availability]}`}
-          >
-            {availabilityLabels[presentation.availability]}
-          </span>
-          <span className="shrink-0 rounded-full bg-linen px-3 py-1 text-xs font-black text-berry">
-            {presentation.type}
-          </span>
+        <div className="flex flex-wrap items-center gap-2 text-xs font-extrabold text-berry">
+          <span>{presentation.type}</span>
+          <span className="h-1 w-1 rounded-full bg-stone-300" />
+          <span>{presentation.classification}</span>
         </div>
 
-        <h3 className="mt-2 line-clamp-1 text-lg font-black text-ink">{presentation.title}</h3>
-        <p className="mt-2 flex items-center gap-1.5 text-sm font-bold text-stone-500">
+        <h3 className="mt-1.5 line-clamp-1 text-lg font-extrabold text-ink">
+          {presentation.title}
+        </h3>
+        <p className="mt-1.5 flex items-center gap-1.5 text-sm font-bold text-stone-500">
           <MapPin size={15} aria-hidden="true" />
-          {property.city}، {property.neighborhood}
+          {property.city}، حي {property.neighborhood}
         </p>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm font-bold text-stone-600">
-          <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 shadow-sm">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-stone-100 py-3 text-xs font-bold text-stone-600">
+          <span className="inline-flex items-center gap-1">
             <BedDouble size={15} aria-hidden="true" />
             {formatRooms(property)}
           </span>
-          {property.services.length > 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 shadow-sm">
-              <Store size={15} aria-hidden="true" />
-              خدمات قريبة
+          <span className="inline-flex items-center gap-1">
+            <Bath size={15} aria-hidden="true" />
+            {property.bathrooms.toLocaleString("ar-SA")} حمام
+          </span>
+          {property.hasElevator ? (
+            <span className="inline-flex items-center gap-1">
+              <Building2 size={15} aria-hidden="true" />
+              مصعد
             </span>
           ) : null}
-          {hasNearbyUniversity(property) ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 shadow-sm">
-              <GraduationCap size={15} aria-hidden="true" />
-              جامعة قريبة
+          {hasInternet(property) ? (
+            <span className="inline-flex items-center gap-1">
+              <Wifi size={15} aria-hidden="true" />
+              إنترنت
+            </span>
+          ) : null}
+          {hasSecurityCameras(property) ? (
+            <span className="inline-flex items-center gap-1">
+              <Camera size={15} aria-hidden="true" />
+              كاميرات مراقبة
             </span>
           ) : null}
         </div>
 
-        <p className="mt-3 text-base font-black text-ink">
-          {price} ر.س <span className="font-bold text-stone-500">/ {pricePeriod}</span>
-        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-extrabold">
+          {property.rentIncludes?.length ? (
+            <span className="inline-flex items-center gap-1 bg-emerald-50 px-2.5 py-1.5 text-emerald-700">
+              <Sparkles size={13} aria-hidden="true" />
+              شامل خدمات
+            </span>
+          ) : null}
+          {property.services.length ? (
+            <span className="inline-flex items-center gap-1 bg-sky-50 px-2.5 py-1.5 text-sky-700">
+              <Store size={13} aria-hidden="true" />
+              قريب من الخدمات
+            </span>
+          ) : null}
+          {property.landmark ? (
+            <span className="inline-flex min-w-0 items-center gap-1 bg-fuchsia-50 px-2.5 py-1.5 text-berry">
+              <Landmark size={13} aria-hidden="true" />
+              <span className="max-w-32 truncate">{property.landmark}</span>
+            </span>
+          ) : null}
+        </div>
+
+        <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+          <p className="text-xl font-extrabold text-ink">
+            {presentation.price.toLocaleString("ar-SA")}{" "}
+            <span className="text-xs font-bold text-stone-500">ر.س</span>
+          </p>
+          <span className="bg-linen px-2.5 py-1.5 text-xs font-extrabold text-berry">
+            {presentation.pricePeriod}
+          </span>
+        </div>
       </button>
     </article>
   );

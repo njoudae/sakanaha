@@ -12,6 +12,7 @@ import {
   type RouteResult,
 } from "@saknaha/providers";
 import { v } from "convex/values";
+import { resolveGoogleMapsLocationUrl } from "@saknaha/utils/directions";
 import { internal } from "./_generated/api";
 import { action, type ActionCtx } from "./_generated/server";
 
@@ -54,6 +55,52 @@ const routeResult = v.object({
   summary: v.optional(v.string()),
   polyline: v.optional(v.string()),
 });
+
+const mapsLocationResult = v.union(
+  v.object({
+    ok: v.literal(true),
+    coordinates: point,
+    normalizedUrl: v.string(),
+  }),
+  v.object({
+    ok: v.literal(false),
+    reason: v.union(
+      v.literal("invalid_url"),
+      v.literal("unsupported_protocol"),
+      v.literal("unsupported_host"),
+      v.literal("short_url"),
+      v.literal("missing_coordinates"),
+      v.literal("invalid_coordinates"),
+      v.literal("suspected_swap"),
+    ),
+  }),
+);
+
+function assertValidPoint(value: GeoPoint) {
+  if (
+    !Number.isFinite(value.lat) ||
+    !Number.isFinite(value.lng) ||
+    value.lat < -90 ||
+    value.lat > 90 ||
+    value.lng < -180 ||
+    value.lng > 180 ||
+    (value.lat === 0 && value.lng === 0)
+  ) {
+    throw new Error("Coordinates are invalid.");
+  }
+}
+
+function assertValidContext(value: MapsRequestContext | undefined) {
+  if (
+    value?.language !== undefined &&
+    !/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8}){0,3}$/.test(value.language)
+  ) {
+    throw new Error("Maps language is invalid.");
+  }
+  if (value?.regionCode !== undefined && !/^[A-Za-z]{2}$/.test(value.regionCode)) {
+    throw new Error("Maps region code is invalid.");
+  }
+}
 
 async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
@@ -162,12 +209,24 @@ export const geocode = action({
   },
   returns: v.array(addressResult),
   handler: async (ctx, args) => {
+    const normalizedQuery = args.query.trim();
+    if (
+      normalizedQuery.length < 3 ||
+      normalizedQuery.length > 240 ||
+      Array.from(normalizedQuery).some((character) => {
+        const code = character.charCodeAt(0);
+        return code < 32 || code === 127;
+      })
+    ) {
+      throw new Error("The address query length is invalid.");
+    }
+    assertValidContext(args.context);
     const provider = createConfiguredProvider(ctx);
     const requestHash = await sha256Hex(
       JSON.stringify({
         op: "geocode",
         provider: provider.provider,
-        query: args.query,
+        query: normalizedQuery,
         context: args.context,
       }),
     );
@@ -187,13 +246,13 @@ export const geocode = action({
       ];
     }
 
-    const results = await provider.geocode(args.query, args.context);
+    const results = await provider.geocode(normalizedQuery, args.context);
     const first = results[0];
     if (first) {
       await ctx.runMutation(internal.mapsCache.storeGeocodeCache, {
         provider: provider.provider,
         requestHash,
-        query: args.query,
+        query: normalizedQuery,
         lat: first.point.lat,
         lng: first.point.lng,
         formattedAddress: first.formattedAddress,
@@ -212,6 +271,8 @@ export const reverseGeocode = action({
   },
   returns: v.array(addressResult),
   handler: async (ctx, args) => {
+    assertValidPoint(args.point);
+    assertValidContext(args.context);
     const provider = createConfiguredProvider(ctx);
     const requestHash = await sha256Hex(
       JSON.stringify({
@@ -261,6 +322,9 @@ async function getRouteWithCache(
   destination: GeoPoint,
   contextValue: MapsRequestContext | undefined,
 ) {
+  assertValidPoint(origin);
+  assertValidPoint(destination);
+  assertValidContext(contextValue);
   const provider = createConfiguredProvider(ctx);
   const requestHash = await sha256Hex(
     JSON.stringify({
@@ -323,5 +387,14 @@ export const calculateTravelTime = action({
   handler: async (ctx, args): Promise<number> => {
     const route = await getRouteWithCache(ctx, args.origin, args.destination, args.context);
     return route.travelTimeSeconds;
+  },
+});
+
+export const resolveGoogleMapsLocationLink = action({
+  args: { url: v.string() },
+  returns: mapsLocationResult,
+  handler: async (_ctx, args) => {
+    if (args.url.length > 2_048) return { ok: false as const, reason: "invalid_url" as const };
+    return await resolveGoogleMapsLocationUrl(args.url);
   },
 });

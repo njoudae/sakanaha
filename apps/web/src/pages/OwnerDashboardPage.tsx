@@ -16,6 +16,7 @@ export default function OwnerDashboardPage({
   owner,
   onAddProperty,
   onManage,
+  onEdit,
   onView,
   onLogout,
 }: OwnerDashboardPageProps) {
@@ -23,13 +24,18 @@ export default function OwnerDashboardPage({
   const interests = getOwnerInterests(owner.id);
 
   return (
-    <main className="page-shell" dir="rtl">
+    <main className="page-shell" dir="rtl" id="owner-dashboard-overview">
       <header className="mb-6 rounded-2xl border border-white/70 bg-white/85 p-4 text-right shadow-soft md:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-black text-mintdeep">لوحة صاحب السكن</p>
-            <h1 className="mt-1 text-3xl font-black text-ink">مرحباً {owner.fullName}</h1>
+            <h1 className="mt-1 text-2xl font-black text-ink">مرحباً {owner.fullName}</h1>
             <p className="mt-2 text-sm font-bold text-stone-600">رقم الجوال: {owner.phone}</p>
+            {owner.publicCode ? (
+              <p className="mt-1 text-xs font-black text-berry" dir="ltr">
+                رقم المستخدم: {owner.publicCode}
+              </p>
+            ) : null}
           </div>
           <div className="flex">
             <button className="danger-button" onClick={onLogout}>
@@ -74,19 +80,47 @@ export default function OwnerDashboardPage({
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {properties.map((property) => (
-              <PropertyCard
-                key={property.id}
-                property={property}
-                onView={() => onView(property.id)}
-                compact
-                actionLabel="عرض كما تشاهده الباحثات"
-              />
+              <div className="grid gap-2" key={property.id}>
+                <div className="rounded-2xl bg-white p-3 text-sm font-black text-stone-700">
+                  الحالة: {publicationStatusLabel(property)}
+                  {property.rejectionReason ? (
+                    <p className="mt-2 rounded-xl bg-rose-50 p-3 text-rose-800">
+                      سبب الرفض: {property.rejectionReason}
+                    </p>
+                  ) : null}
+                </div>
+                <PropertyCard
+                  property={property}
+                  onView={() =>
+                    property.publicationStatus === "rejected"
+                      ? onEdit(property)
+                      : onView(property.id)
+                  }
+                  compact
+                  actionLabel={
+                    property.publicationStatus === "rejected"
+                      ? "عرض وتعديل الإعلان"
+                      : "عرض كما تشاهده الباحثات"
+                  }
+                />
+              </div>
             ))}
           </div>
         )}
       </section>
     </main>
   );
+}
+
+function publicationStatusLabel(property: Property) {
+  const status =
+    property.publicationStatus ?? (property.status === "published" ? "approved" : "draft");
+  if (status === "pending_review") return "بانتظار مراجعة الإدارة";
+  if (status === "approved") return "معتمد ومنشور";
+  if (status === "rejected") return "مرفوض — يمكنك التعديل وإعادة الإرسال";
+  if (status === "archived") return "مؤرشف";
+  if (status === "unpublished") return "غير منشور";
+  return "مسودة";
 }
 
 function ActionCard({

@@ -39,7 +39,10 @@ Geocoding and reverse geocoding cache successful first results in `geocodeCache`
 
 ## Fallback
 
-The configured provider is tried first. Configured fallbacks are tried next. If all routing providers fail, the route operation returns a straight-line estimated fallback so the UI can degrade gracefully without crashing.
+The configured provider is tried first and configured fallbacks are tried next. If every routing
+provider fails, route and travel-time operations fail without inventing distance or duration. The UI
+keeps the free Google Maps directions link available independently. Straight-line distance may be
+calculated locally only when it is explicitly labelled as approximate straight-line distance.
 
 ## Health And Circuit Breaker
 

@@ -36,6 +36,19 @@ Build the web app:
 npm run build
 ```
 
+Run the complete production validation surface:
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run test:security
+npm audit --audit-level=low
+npm run build
+npm run validate:environment
+npm run validate:deployment -- --artifact
+```
+
 Run a workspace command directly:
 
 ```bash
@@ -63,3 +76,6 @@ Production architecture and rollout guidance lives in:
 - `docs/data-migration-strategy.md`
 - `docs/provider-configuration.md`
 - `docs/rollout-rollback.md`
+- `docs/ci-cd.md`
+- `docs/deployment-failure-recovery.md`
+- `docs/production-readiness-report.md`

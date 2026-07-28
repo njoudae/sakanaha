@@ -21,21 +21,17 @@ Each milestone closeout must include:
 
 ## Validation Commands
 
-Until M2 adds production hygiene scripts, missing commands must be reported clearly.
-
-Current known root commands:
-
-- `npm run build`
-- `npm run build:all`
-- `npm run dev`
-- `npm run preview`
-
-Expected future commands after M2:
+Current release-gate commands:
 
 - `npm run lint`
 - `npm run typecheck`
 - `npm test`
 - `npm run build`
+- `npm run test:security`
+- `npm audit --audit-level=low`
+- `npm run security:scan`
+- `npm run validate:environment`
+- `npm run validate:deployment`
 
 ## Rollout Stages
 

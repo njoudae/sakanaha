@@ -8,6 +8,7 @@ import {
   type SmsProviderRuntime,
   type TwilioCredentials,
 } from "./smsSupport";
+import { assertSecureProviderEndpoint } from "./providerSecurity";
 
 function encodeBasicAuth(value: string) {
   return globalThis.btoa(value);
@@ -29,16 +30,19 @@ export function createTwilioSmsProvider(
         From: credentials.from,
         Body: smsBodyFromRequest(request),
       });
-      const response = await runtime.fetch(endpoint, {
-        method: "POST",
-        headers: {
-          authorization: `Basic ${encodeBasicAuth(
-            `${credentials.accountSid}:${credentials.authToken}`,
-          )}`,
-          "content-type": "application/x-www-form-urlencoded",
+      const response = await runtime.fetch(
+        assertSecureProviderEndpoint(endpoint, "twilio endpoint"),
+        {
+          method: "POST",
+          headers: {
+            authorization: `Basic ${encodeBasicAuth(
+              `${credentials.accountSid}:${credentials.authToken}`,
+            )}`,
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body,
         },
-        body,
-      });
+      );
 
       if (!response.ok) {
         throw new SmsProviderError(

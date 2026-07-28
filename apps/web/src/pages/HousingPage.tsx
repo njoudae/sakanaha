@@ -19,6 +19,7 @@ interface HousingPageProps {
   onProperty: (propertyId: string) => void;
   onRoommateDetails: (requestId: string) => void;
   onRoommates: () => void;
+  onHome: () => void;
 }
 
 interface RoommateListing {
@@ -32,6 +33,7 @@ export default function HousingPage({
   onProperty,
   onRoommateDetails,
   onRoommates,
+  onHome,
 }: HousingPageProps) {
   const [city, setCity] = useState(initialCity);
   const [visibleCount, setVisibleCount] = useState(12);
@@ -74,34 +76,38 @@ export default function HousingPage({
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-12" dir="rtl">
-      <header className="mb-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+      <button
+        className="mb-5 inline-flex min-h-10 items-center gap-2 border border-stone-200 bg-white px-3 text-sm font-extrabold text-ink shadow-sm transition hover:border-berry hover:text-berry"
+        onClick={onHome}
+        type="button"
+      >
+        <ArrowLeft className="rotate-180" size={17} aria-hidden="true" />
+        العودة للرئيسية
+      </button>
+
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="text-right">
           <p className="text-sm font-black uppercase tracking-wide text-berry">خيارات السكن</p>
-          <h1 className="mt-2 text-3xl font-black text-ink md:text-4xl">
-            جميع خيارات السكن المتاحة للايجار في السعودية
-          </h1>
+          <h1 className="mt-1 text-2xl font-black text-ink md:text-3xl">جميع خيارات السكن</h1>
         </div>
-        <div className="rounded-2xl border border-stone-200 bg-white/90 p-4 text-right shadow-sm">
-          <p className="mb-3 flex items-center gap-2 text-sm font-black text-ink">
+        <label className="flex min-w-0 items-center gap-2 border border-stone-200 bg-white px-3 py-2 text-right shadow-sm sm:w-64">
+          <span className="flex shrink-0 items-center gap-1.5 text-xs font-extrabold text-stone-600">
             <SlidersHorizontal size={17} aria-hidden="true" />
-            فلتر المدينة
-          </p>
-          <label>
-            <span className="label">المدينة</span>
-            <select
-              className="field field-select"
-              value={city}
-              onChange={(event) => setCity(event.target.value)}
-            >
-              <option value="all">كل المدن</option>
-              {cityNames.map((cityName) => (
-                <option key={cityName} value={cityName}>
-                  {cityName}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+            المدينة
+          </span>
+          <select
+            className="min-h-9 min-w-0 flex-1 bg-transparent text-sm font-extrabold text-ink outline-none"
+            value={city}
+            onChange={(event) => setCity(event.target.value)}
+          >
+            <option value="all">كل المدن</option>
+            {cityNames.map((cityName) => (
+              <option key={cityName} value={cityName}>
+                {cityName}
+              </option>
+            ))}
+          </select>
+        </label>
       </header>
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
